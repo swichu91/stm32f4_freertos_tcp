@@ -14,6 +14,7 @@ RM := rm -rf
 -include system/src/cortexm/subdir.mk
 -include system/src/cmsis/subdir.mk
 -include src/subdir.mk
+-include network/subdir.mk
 -include managment/subdir.mk
 -include FreeRTOS/portable/MemMang/subdir.mk
 -include FreeRTOS/portable/ARM_CM4F/subdir.mk

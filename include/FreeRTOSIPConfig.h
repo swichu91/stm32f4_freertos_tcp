@@ -108,7 +108,7 @@ on).  Valid options are FREERTOS_BIG_ENDIAN and FREERTOS_LITTLE_ENDIAN. */
 /* If the network card/driver includes checksum offloading (IP/TCP/UDP checksums)
 then set ipconfigDRIVER_INCLUDED_RX_IP_CHECKSUM to 1 to prevent the software
 stack repeating the checksum calculations. */
-#define ipconfigDRIVER_INCLUDED_RX_IP_CHECKSUM   0 // TODO hardware checksum
+#define ipconfigDRIVER_INCLUDED_RX_IP_CHECKSUM   1 // TODO hardware checksum
 
 /* Several API's will block until the result is known, or the action has been
 performed, for example FreeRTOS_send() and FreeRTOS_recv().  The timeouts can be
@@ -166,7 +166,7 @@ network event hook at the appropriate times.  If ipconfigUSE_NETWORK_EVENT_HOOK
 is not set to 1 then the network event hook will never be called.  See
 http://www.FreeRTOS.org/FreeRTOS-Plus/FreeRTOS_Plus_UDP/API/vApplicationIPNetworkEventHook.shtml
 */
-#define ipconfigUSE_NETWORK_EVENT_HOOK 0
+#define ipconfigUSE_NETWORK_EVENT_HOOK 1
 
 /* Sockets have a send block time attribute.  If FreeRTOS_sendto() is called but
 a network buffer cannot be obtained then the calling task is held in the Blocked
@@ -276,7 +276,9 @@ contain.  For normal Ethernet V2 frames the maximum MTU is 1500.  Setting a
 lower value can save RAM, depending on the buffer management scheme used.  If
 ipconfigCAN_FRAGMENT_OUTGOING_PACKETS is 1 then (ipconfigNETWORK_MTU - 28) must
 be divisible by 8. */
-#define ipconfigNETWORK_MTU		1200
+#define ipconfigNETWORK_MTU		1524 // 4 byte aligned
+
+#define ipconfigTCP_MSS			1460
 
 /* Set ipconfigUSE_DNS to 1 to include a basic DNS client/resolver.  DNS is used
 through the FreeRTOS_gethostbyname() API function. */
@@ -328,10 +330,12 @@ simultaneously, one could define TCP_WIN_SEG_COUNT as 120. */
 
 /* Each TCP socket has a circular buffers for Rx and Tx, which have a fixed
 maximum size.  Define the size of Rx buffer for TCP sockets. */
-#define ipconfigTCP_RX_BUF_LEN			( 1000 )
+#define ipconfigTCP_RX_BUF_LEN			( 16 * ipconfigTCP_MSS ) // todo: tutaj ostroznie, nie wiem czy z ramem sie wyrobie
 
 /* Define the size of Tx buffer for TCP sockets. */
-#define ipconfigTCP_TX_BUF_LEN			( 1000 )
+#define ipconfigTCP_TX_BUF_LEN			( 16 * ipconfigTCP_MSS )
+
+
 
 /* When using call-back handlers, the driver may check if the handler points to
 real program memory (RAM or flash) or just has a random non-zero value. */

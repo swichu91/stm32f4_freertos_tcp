@@ -130,7 +130,7 @@ void print_console (char const * string)
 
 	    for(; *string!= 0; string++)
 	    {
-	        xQueueSend( TxconsoleQueue, ( void * ) string, 0 );
+	        xQueueSend( TxconsoleQueue, ( void * ) string, 10 );
 	    }
 
 	    //ustaw semafor, watek ConsoleTaskTx bedzie mogl wyslac dane

@@ -6,8 +6,14 @@
 #include "console.h"
 #include <stddef.h>
 #include <stdlib.h>
-//#include "FreeRTOS.h"
-//#include "FreeRTOS_IP.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+#include "FreeRTOS_IP.h"
+#include "FreeRTOS_IP_Private.h"
+
+
 
 
 extern char arg[MAX_LEX_COUNT][MAX_LEX_LEN];
@@ -48,7 +54,7 @@ void change_cmd (void *tsm)
 			ptr=strtok(NULL,".");
 		}
 
-	//FreeRTOS_SetIPAddress(0x100);
+	FreeRTOS_SetIPAddress(FreeRTOS_inet_addr_quick(param_integer[0],param_integer[1],param_integer[2],param_integer[3]));
 
 
 
@@ -56,7 +62,7 @@ void change_cmd (void *tsm)
 	else if(!(strcmp(&arg[1][0],"gw")))
 	{
 
-
+		//todo: nie da sie zmienic adresu ip itd w locie (przynajmniej narazie nie wiem) wiec zapiszemy do flash te dane i resetujemy urzadzenie
 
 
 	}

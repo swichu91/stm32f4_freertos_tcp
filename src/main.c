@@ -144,8 +144,6 @@ void Main_task (void * pvparameters)
 	                     ucDNSServerAddress,
 	                     ucMACAddress );
 
-
-//	Lwip_init();
 	vTaskDelete(NULL);
 }
 
@@ -169,7 +167,7 @@ main(int argc, char* argv[])
 	usart_init(3000000); // usart na 3MHz to jest maks co ft232 moze wyciagnac
 
 
-	xTaskCreate(Main_task,"Main", 8096, NULL,1, NULL);
+	xTaskCreate(Main_task,"Main", 8096, NULL,0, NULL);
 
 
 
