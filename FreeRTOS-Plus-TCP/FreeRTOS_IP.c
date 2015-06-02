@@ -2027,6 +2027,7 @@ void FreeRTOS_SetIPAddress( uint32_t xIpAddress )
 {
 	/* Sets the IP address of the NIC. */
 	*ipLOCAL_IP_ADDRESS_POINTER = xIpAddress;
+	xNetworkAddressing.ulDefaultIPAddress = xIpAddress; // dodane przeze mnie bo i naczej nie chcialo dzialac
 }
 /*-----------------------------------------------------------*/
 

@@ -27,9 +27,9 @@ struct history
 
 typedef struct __action_command
 {
-	const signed char command[32];
+	const char command[32];
 	void (*action)(void *tsm);
-	char idx_in_help_file[4];
+	uint32_t idx_in_help_file;
 }_action_command;
 
 

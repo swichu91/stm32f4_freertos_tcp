@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include "console.h"
 
+
 /* FreeRTOS+TCP includes. */
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_IP_Private.h"
@@ -30,6 +31,7 @@ access functions. */
 #include "stm32f4xx_hal.h"
 
 #include "udpd.h"
+#include "global_db.h"
 
 
 /* Global Ethernet handle*/
@@ -44,9 +46,6 @@ __ALIGN_BEGIN ETH_DMADescTypeDef  DMATxDscrTab[ETH_TXBUFNB] __ALIGN_END;/* Ether
 __ALIGN_BEGIN uint8_t Rx_Buff[ETH_RXBUFNB][ETH_RX_BUF_SIZE] __ALIGN_END; /* Ethernet Receive Buffer */
 
 __ALIGN_BEGIN uint8_t Tx_Buff[ETH_TXBUFNB][ETH_TX_BUF_SIZE] __ALIGN_END; /* Ethernet Transmit Buffer */
-
-
-static uint8_t zerocopy_bufor_tab[ETH_RXBUFNB]; // global tab to hold pointers to zero copy bufors
 
 
 SemaphoreHandle_t xEMACRxEventSemaphore;
@@ -130,30 +129,17 @@ void HAL_ETH_MspInit(ETH_HandleTypeDef* heth)
   }
 }
 
-
+// configure rj45 leds
 static void setPHYleds(ETH_HandleTypeDef * heth)
 {
 	uint32_t regvalue;
 
 	HAL_ETH_ReadPHYRegister(heth, PHY_CR, &regvalue);
 
-	regvalue &=~((1<<5) | (1<<6)); // mode 2 led
+	regvalue &=~((1<<5) | (1<<6)); // mode 3 led -> orange->LINK , green -> FD/HD
+	regvalue |=(1<<6);
 
 	HAL_ETH_WritePHYRegister(heth, PHY_CR, regvalue );
-
-}
-
-
-void InitializeZeroCopyBuffersRx(uint8_t buff_nr,uint8_t *buff_tab)
-{
-	uint8_t i;
-
-	for(i=0;i<buff_nr;i++)
-	{
-
-		buff_tab[i] = pucGetNetworkBuffer((size_t)ETH_RX_BUF_SIZE) ;
-
-	}
 
 }
 
@@ -169,8 +155,8 @@ BaseType_t xNetworkInterfaceInitialise( void )
 	uint8_t MACAddr[6] ;
 
 	heth_global.Instance = ETH;
-	heth_global.Init.AutoNegotiation = ETH_AUTONEGOTIATION_DISABLE;
-	heth_global.Init.Speed = ETH_SPEED_10M;
+	heth_global.Init.AutoNegotiation = ETH_AUTONEGOTIATION_ENABLE;
+	heth_global.Init.Speed = ETH_SPEED_100M;
 	heth_global.Init.DuplexMode = ETH_MODE_FULLDUPLEX;
 	heth_global.Init.PhyAddress = DP83848_PHY_ADDRESS;
 	MACAddr[0] = MAC_ADDR0;
@@ -181,20 +167,16 @@ BaseType_t xNetworkInterfaceInitialise( void )
 	MACAddr[5] = MAC_ADDR5;
 	heth_global.Init.MACAddr = &MACAddr[0];
 	heth_global.Init.RxMode = ETH_RXINTERRUPT_MODE;
-	heth_global.Init.ChecksumMode = ETH_CHECKSUM_BY_SOFTWARE; // TODO: przerobic na hardware
+	heth_global.Init.ChecksumMode = ETH_CHECKSUM_BY_SOFTWARE;
 	heth_global.Init.MediaInterface = ETH_MEDIA_INTERFACE_RMII;
 	hal_eth_init_status = HAL_ETH_Init(&heth_global);
 
 	  if (hal_eth_init_status == HAL_OK)
 	  {
-
+		  print_console("MAC init --> OK\r\n");
 		  status = pdPASS;
 	  }
-	  else return pdFAIL;
-
-
-	InitializeZeroCopyBuffersRx(ETH_RXBUFNB,zerocopy_bufor_tab);
-
+	  else {return pdFAIL; print_console("MAC init --> failed\r\n");}
 
 
 	/* Initialize Tx Descriptors list: Chain Mode */
@@ -510,10 +492,13 @@ uint32_t i=0;
          if( xTasksAlreadyCreated == pdFALSE )
          {
 
-        	 if(xTaskCreate(vUDPReceiveDeamon,"udprx",UDPD_STACK_SIZE,NULL,UDPD_PRIO,NULL)==pdPASS) print_console("Creating UDP task -- > OK\r\n");
-        	 else print_console("Creating UDP task -- > failed\r\n");
+        	 if(xTaskCreate(vUDPReceiveDeamon,"udprx",UDPD_STACK_SIZE,NULL,UDPD_PRIO,NULL)==pdPASS) print_console("Creating UDP Ping Pong task -- > OK\r\n");
+        	 else print_console("Creating UDP Ping Pong task -- > failed\r\n");
 
-
+        	 if(xTaskCreate(vUDPTransmitCANFramesTask,"Tx CAN/UDP",UDPD_CAN_TX_SIZE,NULL,UDP_CAN_TX_PRIO,NULL)==pdPASS) print_console("Creating UDP/CAN Tx task -- > OK\r\n");
+        	 else print_console("Creating UDP/CAN Tx -- > failed\r\n");
+        	// if(xTaskCreate(vCreateTCPServerSocket,"tcprx",2024,NULL,0,NULL)==pdPASS)print_console("Creating TCP task --> OK\r\n");
+        	 //else print_console("Creating TCP task -- > failed\r\n");
 
 
              xTasksAlreadyCreated = pdTRUE;
@@ -529,24 +514,29 @@ uint32_t i=0;
          print_console("\r\n-----------------------\r\n\r\n");
 
          /* Convert the IP address to a string then print it out. */
+
          FreeRTOS_inet_ntoa( ulIPAddress,  cBuffer );
          sprintf( bufor,"IP Address: %s\r\n", cBuffer );
          print_console(bufor);
+         gdb.sys.ipaddress = ulIPAddress;
 
          /* Convert the net mask to a string then print it out. */
          FreeRTOS_inet_ntoa( ulNetMask, cBuffer );
          sprintf( bufor,"Subnet Mask: %s\r\n", cBuffer );
          print_console(bufor);
+         gdb.sys.maskaddress = ulNetMask;
 
          /* Convert the IP address of the gateway to a string then print it out. */
          FreeRTOS_inet_ntoa( ulGatewayAddress, cBuffer );
          sprintf( bufor,"Gateway IP Address: %s\r\n", cBuffer );
          print_console(bufor);
+         gdb.sys.gwaddress = ulGatewayAddress;
 
          /* Convert the IP address of the DNS server to a string then print it out. */
          FreeRTOS_inet_ntoa( ulDNSServerAddress, cBuffer );
          sprintf( bufor,"DNS server IP Address: %s\r\n", cBuffer );
          print_console(bufor);
+         gdb.sys.dnsaddress = ulDNSServerAddress;
      }
  }
 

@@ -63,12 +63,17 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include "stm32f407xx.h"
 
 /*
  * Moje define do konfiguracji mac/phy
  */
 
 #define PHY_LINK_CHANGE_INT 0
+
+//definicje sprzetowej zamiany kolejnosci bajtów(realizowane w jednym cyklu)
+#define FreeRTOS_htons(VALUE) __REV16(VALUE)
+#define FreeRTOS_htonl(VALUE) __REV(VALUE)
 
 
 

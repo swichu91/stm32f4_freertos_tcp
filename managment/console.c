@@ -77,13 +77,42 @@ static void usart_put_char(char byte);
 const _action_command comm_act[] =
 {
 		 {"help",            help_cmd},
-		 {"change",			 change_cmd}
+		 {"change",			 change_cmd},
+		 {"resetcpu",		 reset_cmd},
+		 {"cmdlist",		 commlist_cmd},
+		 {"show",			 show_cmd},
+		 {"udp",			 udp_cmd},
+		 {"tasklist",		 tasks_list_cmd}
 
 
 
 };
 
 
+
+void commlist_cmd(void *tsm)
+{
+
+	uint32_t max_nr = sizeof(comm_act)/sizeof(_action_command);
+	uint32_t i;
+
+	char bufor[34];
+
+	print_console("Avaible commands list:\r\n");
+
+	for(i=0;i<max_nr;i++)
+	{
+
+		if(strcmp(comm_act[i].command,"cmdlist"))
+		{
+			strcpy(bufor,comm_act[i].command);
+			strcat(bufor,"\r\n");
+			print_console(bufor);
+		}
+
+	}
+
+}
 
 
 
@@ -126,15 +155,22 @@ void print_console (char const * string)
 {
 
 
-	 // wpis do kolejki
+		if(TxconsoleQueue && Txconsole )
+		{
+			// wpis do kolejki
 
-	    for(; *string!= 0; string++)
-	    {
-	        xQueueSend( TxconsoleQueue, ( void * ) string, 10 );
-	    }
+			for(; *string!= 0; string++)
+			{
+				xQueueSend( TxconsoleQueue, ( void * ) string, 10 );
+			}
 
-	    //ustaw semafor, watek ConsoleTaskTx bedzie mogl wyslac dane
-	    xSemaphoreGive(Txconsole);
+			//ustaw semafor, watek ConsoleTaskTx bedzie mogl wyslac dane
+			xSemaphoreGive(Txconsole);
+		}
+		else
+		{
+			usart_put_string(string);
+		}
 }
 
 
@@ -443,9 +479,6 @@ void usart_init(uint32_t baudrate)
 
 	 NVIC_SetPriority(USART6_IRQn,10);
 	 NVIC_EnableIRQ(USART6_IRQn);
-
-
-
 }
 
 static void usart_put_char(char byte)
@@ -460,9 +493,12 @@ static void usart_put_char(char byte)
 static void usart_put_string(char* string)
 {
 
-	while(*string++)
+
+	while(*string)
 	{
 		usart_put_char(*string);
+		string++;
+
 	}
 }
 
@@ -471,7 +507,6 @@ static void usart_put_string(char* string)
 void USART6_IRQHandler()
 {
 
-	//todo: wystaw semafor odbiorczy
 	char onechar;
 	long lHigherPriorityTaskWoken = pdFALSE;
 
@@ -479,8 +514,6 @@ void USART6_IRQHandler()
 	onechar=(char) USART6->DR;
 
 	xQueueSendFromISR(RxQueue,&onechar,&lHigherPriorityTaskWoken);
-
-
 
 	portEND_SWITCHING_ISR( lHigherPriorityTaskWoken );
 
