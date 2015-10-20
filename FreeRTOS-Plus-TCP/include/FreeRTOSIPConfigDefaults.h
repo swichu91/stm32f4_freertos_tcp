@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+TCP Labs Build 141019 (C) 2014 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -44,19 +44,21 @@
  * 1 tab == 4 spaces!
  *
  * http://www.FreeRTOS.org
- * http://www.FreeRTOS.org/udp
+ * http://www.FreeRTOS.org/plus
+ * http://www.FreeRTOS.org/labs
  *
  */
 
 #ifndef FREERTOS_DEFAULT_IP_CONFIG_H
 #define FREERTOS_DEFAULT_IP_CONFIG_H
 
+/* The error numbers defined in this file will be moved to the core FreeRTOS
+code in future versions of FreeRTOS - at which time the following header file
+will be removed. */
+#include "FreeRTOS_errno_TCP.h"
+
 /* This file provides default values for configuration options that are missing
 from the FreeRTOSIPConfig.h configuration header file. */
-
-/* --------------------------------------------------------
- * HT Added some macro defaults for the PLUS-UDP-TCP project
- * -------------------------------------------------------- */
 
 #ifndef ipconfigUSE_TCP
 	#define	ipconfigUSE_TCP						( 1 )
@@ -74,6 +76,8 @@ from the FreeRTOSIPConfig.h configuration header file. */
 	#endif
 
 	#ifndef ipconfigIGNORE_UNKNOWN_PACKETS
+		/* When non-zero, TCP will not send RST packets in reply to
+		TCP packets which are unknown, or out-of-order. */
 		#define ipconfigIGNORE_UNKNOWN_PACKETS	( 0 )
 	#endif
 #endif
@@ -85,7 +89,7 @@ from the FreeRTOSIPConfig.h configuration header file. */
  * This macro will only be used if FreeRTOS_debug_printf() is defined for logging
  */
 #ifndef ipconfigTCP_MAY_LOG_PORT
-#define ipconfigTCP_MAY_LOG_PORT(xPort)			( ( xPort ) != 23 )
+	#define ipconfigTCP_MAY_LOG_PORT(xPort)			( ( xPort ) != 23 )
 #endif
 
 
@@ -104,7 +108,7 @@ from the FreeRTOSIPConfig.h configuration header file. */
  *
  *     #define FreeRTOS_debug_printf( MSG )			my_printf MSG
  *
- * The FreeRTOS_debug_printf() must be thread-safe but does not have to be 
+ * The FreeRTOS_debug_printf() must be thread-safe but does not have to be
  * interrupt-safe.
  */
 #ifdef ipconfigHAS_DEBUG_PRINTF
@@ -194,7 +198,7 @@ from the FreeRTOSIPConfig.h configuration header file. */
 #endif
 
 #ifndef ipconfigUDP_MAX_SEND_BLOCK_TIME_TICKS
-	#define ipconfigUDP_MAX_SEND_BLOCK_TIME_TICKS ( 20 / portTICK_PERIOD_MS )
+	#define ipconfigUDP_MAX_SEND_BLOCK_TIME_TICKS ( pdMS_TO_TICKS( 20 ) )
 #endif
 
 #ifndef ipconfigARP_CACHE_ENTRIES
@@ -250,7 +254,28 @@ from the FreeRTOSIPConfig.h configuration header file. */
 #endif
 
 #ifndef ipconfigUSE_DHCP
-	#define ipconfigUSE_DHCP	1
+	#define ipconfigUSE_DHCP				1
+#endif
+
+#ifndef ipconfigDHCP_USES_USER_HOOK
+	#define ipconfigDHCP_USES_USER_HOOK		0
+#endif
+
+#ifndef ipconfigDHCP_FALL_BACK_AUTO_IP
+	/*
+	 * Only applicable when DHCP is in use:
+	 * If no DHCP server responds, use "Auto-IP" : the
+	 * device will allocate a random LinkLayer IP address.
+	 */
+	#define ipconfigDHCP_FALL_BACK_AUTO_IP		( 0 )
+#endif
+
+#if( ipconfigDHCP_FALL_BACK_AUTO_IP != 0 )
+	#define ipconfigARP_USE_CLASH_DETECTION		1
+#endif
+
+#ifndef ipconfigARP_USE_CLASH_DETECTION
+	#define ipconfigARP_USE_CLASH_DETECTION		0
 #endif
 
 #ifndef ipconfigNETWORK_MTU
@@ -276,9 +301,9 @@ from the FreeRTOSIPConfig.h configuration header file. */
 
 #ifndef ipconfigMAXIMUM_DISCOVER_TX_PERIOD
 	#ifdef _WINDOWS_
-		#define ipconfigMAXIMUM_DISCOVER_TX_PERIOD		( 999 / portTICK_PERIOD_MS )
+		#define ipconfigMAXIMUM_DISCOVER_TX_PERIOD		( pdMS_TO_TICKS( 999 ) )
 	#else
-		#define ipconfigMAXIMUM_DISCOVER_TX_PERIOD		( 30000 / portTICK_PERIOD_MS )
+		#define ipconfigMAXIMUM_DISCOVER_TX_PERIOD		( pdMS_TO_TICKS( 30000 ) )
 	#endif /* _WINDOWS_ */
 #endif /* ipconfigMAXIMUM_DISCOVER_TX_PERIOD */
 
@@ -307,6 +332,13 @@ from the FreeRTOSIPConfig.h configuration header file. */
 #ifndef ipconfigUSE_LLMNR
 	/* Include support for LLMNR: Link-local Multicast Name Resolution (non-Microsoft) */
 	#define ipconfigUSE_LLMNR					( 0 )
+#endif
+
+#if( !defined( ipconfigUSE_DNS ) )
+	#if( ( ipconfigUSE_LLMNR != 0 ) || ( ipconfigUSE_NBNS != 0 ) )
+		/* LLMNR and NBNS depend on DNS because those protocols share a lot of code. */
+		#error When either LLMNR or NBNS is used, ipconfigUSE_DNS must be defined
+	#endif
 #endif
 
 #ifndef ipconfigREPLY_TO_INCOMING_PINGS
@@ -378,6 +410,23 @@ from the FreeRTOSIPConfig.h configuration header file. */
 
 #ifndef ipconfigHAS_INLINE_FUNCTIONS
 	#define	ipconfigHAS_INLINE_FUNCTIONS	( 1 )
+#endif
+
+#ifndef portINLINE
+	#define portINLINE inline
+#endif
+
+#ifndef ipconfigZERO_COPY_TX_DRIVER
+	/* When non-zero, the buffers passed to the SEND routine may be passed
+	to DMA. As soon as sending is ready, the buffers must be released by
+	calling vReleaseNetworkBufferAndDescriptor(), */
+	#define ipconfigZERO_COPY_TX_DRIVER		( 0 )
+#endif
+
+#ifndef ipconfigZERO_COPY_RX_DRIVER
+	/* This define doesn't mean much to the driver, except that it makes
+	sure that pxPacketBuffer_to_NetworkBuffer() will be included. */
+	#define ipconfigZERO_COPY_RX_DRIVER		( 0 )
 #endif
 
 #endif /* FREERTOS_DEFAULT_IP_CONFIG_H */

@@ -43,12 +43,74 @@ __ALIGN_BEGIN ETH_DMADescTypeDef  DMARxDscrTab[ETH_RXBUFNB] __ALIGN_END;/* Ether
 
 __ALIGN_BEGIN ETH_DMADescTypeDef  DMATxDscrTab[ETH_TXBUFNB] __ALIGN_END;/* Ethernet Tx DMA Descriptor */
 
-__ALIGN_BEGIN uint8_t Rx_Buff[ETH_RXBUFNB][ETH_RX_BUF_SIZE] __ALIGN_END; /* Ethernet Receive Buffer */
+__ALIGN_BEGIN uint8_t Rx_Buff[16][ETH_RX_BUF_SIZE] __ALIGN_END; /* Ethernet Receive Buffer */
 
-__ALIGN_BEGIN uint8_t Tx_Buff[ETH_TXBUFNB][ETH_TX_BUF_SIZE] __ALIGN_END; /* Ethernet Transmit Buffer */
+__ALIGN_BEGIN uint8_t Tx_Buff[16][ETH_TX_BUF_SIZE] __ALIGN_END; /* Ethernet Transmit Buffer */
 
 
 SemaphoreHandle_t xEMACRxEventSemaphore;
+
+
+
+
+
+
+static void InitializeZeroCopyBuffersRx(uint8_t buff_nr,uint8_t **buff_tab)
+{
+	uint8_t i;
+
+	size_t size = ETH_RX_BUF_SIZE;
+
+	for(i=0;i<buff_nr;i++)
+	{
+		*buff_tab= pucGetNetworkBuffer(&size) ;
+		buff_tab++;
+	}
+
+}
+
+static void InitializeZeroCopyBuffersTx(uint8_t buff_nr,ETH_DMADescTypeDef *DMATxDescTab)
+{
+	uint8_t i;
+
+	for(i=0;i<buff_nr;i++)
+	{
+		DMATxDescTab[i].Buffer1Addr = (uint32_t)NULL;
+	}
+
+}
+
+static void FillZeroCopyBuffersRx(uint8_t buff_nr,ETH_DMADescTypeDef * DMARxDesc, uint8_t** zerocopy_tab)
+{
+
+	uint8_t i;
+
+	 /* Fill each DMARxDesc descriptor buffer1 with the right values */
+	  for(i=0; i < buff_nr; i++)
+	  {
+		  DMARxDesc[i].Buffer1Addr = (uint32_t)zerocopy_tab[i];
+		  DMARxDesc[i].ControlBufferSize = ETH_DMARXDESC_RCH | (ETH_RX_BUF_SIZE);
+	  }
+
+}
+
+static void FillZeroCopyBuffersRx(uint8_t buff_nr,ETH_DMADescTypeDef * DMARxDesc, uint8_t** zerocopy_tab)
+{
+
+	uint8_t i;
+
+	 /* Fill each DMARxDesc descriptor buffer1 with the right values */
+	  for(i=0; i < buff_nr; i++)
+	  {
+		  DMARxDesc[i].Buffer1Addr = (uint32_t)zerocopy_tab[i];
+		  DMARxDesc[i].ControlBufferSize = ETH_DMARXDESC_RCH | (ETH_RX_BUF_SIZE);
+	  }
+
+}
+
+
+
+
 
 void ETH_IRQHandler(void)
 {
@@ -167,8 +229,14 @@ BaseType_t xNetworkInterfaceInitialise( void )
 	MACAddr[5] = MAC_ADDR5;
 	heth_global.Init.MACAddr = &MACAddr[0];
 	heth_global.Init.RxMode = ETH_RXINTERRUPT_MODE;
-	heth_global.Init.ChecksumMode = ETH_CHECKSUM_BY_SOFTWARE;
+#if (ipconfigDRIVER_INCLUDED_RX_IP_CHECKSUM == 1) && (ipconfigDRIVER_INCLUDED_TX_IP_CHECKSUM == 1)
+		heth_global.Init.ChecksumMode = ETH_CHECKSUM_BY_HARDWARE;
+#else
+		heth_global.Init.ChecksumMode = ETH_CHECKSUM_BY_SOFTWARE;
+#endif
+
 	heth_global.Init.MediaInterface = ETH_MEDIA_INTERFACE_RMII;
+
 	hal_eth_init_status = HAL_ETH_Init(&heth_global);
 
 	  if (hal_eth_init_status == HAL_OK)
@@ -246,13 +314,14 @@ BaseType_t xNetworkInterfaceOutput( xNetworkBufferDescriptor_t * const pxDescrip
 
 	      /* Get bytes in current lwIP buffer */
 	      byteslefttocopy = pxDescriptor->xDataLength;
+	      framelength = byteslefttocopy; // copy of frame length
 	      payloadoffset = 0;
 
 	      /* Check if the length of data to copy is bigger than Tx buffer size*/
-	      while( (byteslefttocopy + bufferoffset) > ETH_TX_BUF_SIZE )
+	      while( (byteslefttocopy) > ETH_TX_BUF_SIZE )
 	      {
 	        /* Copy data to Tx buffer*/
-	        memcpy( (uint8_t*)((uint8_t*)buffer + bufferoffset), (uint8_t*)((uint8_t*)pxDescriptor->pucEthernetBuffer + payloadoffset), (ETH_TX_BUF_SIZE - bufferoffset) );
+	        memcpy( (uint8_t*)((uint8_t*)buffer), (uint8_t*)((uint8_t*)pxDescriptor->pucEthernetBuffer + payloadoffset), (ETH_TX_BUF_SIZE) );
 
 	        /* Point to next descriptor */
 	        DmaTxDesc = (ETH_DMADescTypeDef *)(DmaTxDesc->Buffer2NextDescAddr);
@@ -266,17 +335,13 @@ BaseType_t xNetworkInterfaceOutput( xNetworkBufferDescriptor_t * const pxDescrip
 
 	        buffer = (uint8_t *)(DmaTxDesc->Buffer1Addr);
 
-	        byteslefttocopy = byteslefttocopy - (ETH_TX_BUF_SIZE - bufferoffset);
-	        payloadoffset = payloadoffset + (ETH_TX_BUF_SIZE - bufferoffset);
-	        framelength = framelength + (ETH_TX_BUF_SIZE - bufferoffset);
-	        bufferoffset = 0;
+	        byteslefttocopy -= (ETH_TX_BUF_SIZE);
+	        payloadoffset +=(ETH_TX_BUF_SIZE );
+
 	      }
 
 	      /* Copy the remaining bytes */
-	      memcpy( (uint8_t*)((uint8_t*)buffer + bufferoffset), (uint8_t*)((uint8_t*)pxDescriptor->pucEthernetBuffer + payloadoffset), byteslefttocopy );
-	      bufferoffset = bufferoffset + byteslefttocopy;
-	      framelength = framelength + byteslefttocopy;
-
+	      memcpy( (uint8_t*)((uint8_t*)buffer), (uint8_t*)((uint8_t*)pxDescriptor->pucEthernetBuffer + payloadoffset), byteslefttocopy );
 
 	  /* Prepare transmit descriptors to give to DMA */
 	  HAL_ETH_TransmitFrame(&heth_global, framelength);
@@ -330,7 +395,7 @@ uint32_t byteslefttocopy = 0;
 uint32_t i=0;
 
 
-	xEMACRxEventSemaphore=xSemaphoreCreateCounting(10,0);
+	xEMACRxEventSemaphore=xSemaphoreCreateBinary();
 
     for( ;; )
     {
@@ -339,7 +404,7 @@ uint32_t i=0;
         semaphore (to count the Rx events) and that the semaphore has already
         been created (remember this is an example of a simple rather than
         optimised port layer). */
-        xSemaphoreTake( xEMACRxEventSemaphore, portMAX_DELAY );
+        if(xSemaphoreTake( xEMACRxEventSemaphore, portMAX_DELAY )==pdTRUE){
 
 
         /* get received frame */
@@ -469,6 +534,7 @@ uint32_t i=0;
        /* Resume DMA reception */
        heth_global.Instance->DMARPDR = 0;
      }
+    }
 
 }
 
@@ -492,13 +558,13 @@ uint32_t i=0;
          if( xTasksAlreadyCreated == pdFALSE )
          {
 
-        	 if(xTaskCreate(vUDPReceiveDeamon,"udprx",UDPD_STACK_SIZE,NULL,UDPD_PRIO,NULL)==pdPASS) print_console("Creating UDP Ping Pong task -- > OK\r\n");
-        	 else print_console("Creating UDP Ping Pong task -- > failed\r\n");
+        	 //if(xTaskCreate(vUDPReceiveDeamon,"udprx",UDPD_STACK_SIZE,NULL,UDPD_PRIO,NULL)==pdPASS) print_console("Creating UDP Ping Pong task -- > OK\r\n");
+        	 //else print_console("Creating UDP Ping Pong task -- > failed\r\n");
 
-        	 if(xTaskCreate(vUDPTransmitCANFramesTask,"Tx CAN/UDP",UDPD_CAN_TX_SIZE,NULL,UDP_CAN_TX_PRIO,NULL)==pdPASS) print_console("Creating UDP/CAN Tx task -- > OK\r\n");
-        	 else print_console("Creating UDP/CAN Tx -- > failed\r\n");
-        	// if(xTaskCreate(vCreateTCPServerSocket,"tcprx",2024,NULL,0,NULL)==pdPASS)print_console("Creating TCP task --> OK\r\n");
-        	 //else print_console("Creating TCP task -- > failed\r\n");
+        	 //if(xTaskCreate(vUDPTransmitCANFramesTask,"Tx CAN/UDP",UDPD_CAN_TX_SIZE,NULL,UDP_CAN_TX_PRIO,NULL)==pdPASS) print_console("Creating UDP/CAN Tx task -- > OK\r\n");
+        	// else print_console("Creating UDP/CAN Tx -- > failed\r\n");
+        	 if(xTaskCreate(vCreateTCPServerSocket,"tcprx",1024,NULL,0,NULL)==pdPASS)print_console("Creating TCP task --> OK\r\n");
+        	 else print_console("Creating TCP task -- > failed\r\n");
 
 
              xTasksAlreadyCreated = pdTRUE;

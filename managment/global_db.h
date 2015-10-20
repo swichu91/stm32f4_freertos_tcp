@@ -16,7 +16,7 @@
 
 
 
-void gdb_init();
+void gdb_init(void);
 
 typedef struct __sys
 {

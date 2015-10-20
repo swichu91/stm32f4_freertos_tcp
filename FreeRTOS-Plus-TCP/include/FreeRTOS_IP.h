@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+TCP Labs Build 141019 (C) 2014 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -44,28 +44,17 @@
  * 1 tab == 4 spaces!
  *
  * http://www.FreeRTOS.org
- * http://www.FreeRTOS.org/udp
+ * http://www.FreeRTOS.org/plus
+ * http://www.FreeRTOS.org/labs
  *
  */
 
 #ifndef FREERTOS_IP_H
 #define FREERTOS_IP_H
 
-/*
- * _RB_ In this and other header files we should strive to have the following ordering:
- *  #defines
- *  Structure/enum defs
- *  Public functions starting 'FreeRTOS_' - with a comment says they are documented on the web site.
- *  Functions that are not file private, but only intended for use by other +TCP files.
- */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* Use in FreeRTOSIPConfig.h. */
-#define FREERTOS_LITTLE_ENDIAN	0
-#define FREERTOS_BIG_ENDIAN		1
 
 /* Application level configuration options. */
 #include "FreeRTOSIPConfig.h"
@@ -80,28 +69,6 @@ extern "C" {
 #define ipSIZE_OF_UDP_HEADER			8
 #define ipSIZE_OF_TCP_HEADER			20
 
-/* Various return values. */
-#define	FREERTOS_ERRNO_EBADF			9		/* Bad file number */
-#define	FREERTOS_ERRNO_EINTR			4		/* Interrupted system call */
-#define	FREERTOS_ERRNO_EIO				5		/* I/O error */
-#define	FREERTOS_ERRNO_EAGAIN			11		/* Try again, same as EWOULDBLOCK */
-#define	FREERTOS_ERRNO_EWOULDBLOCK		11		/* Operation would block, same EAGAIN */
-#define	FREERTOS_ERRNO_ENOMEM			12		/* Out of memory */
-#define FREERTOS_ERRNO_EINVAL			22		/* Invalid argument */
-												/* accept(): Socket is not listening for connections, or addrlen is invalid (e.g., is negative). */
-#define	FREERTOS_ERRNO_ENOSPC			28		/* Try to send data but buffers are full after timeout */
-#define	FREERTOS_ERRNO_ENOPROTOOPT		92		/* Protocol not available */
-#define FREERTOS_ERRNO_EOPNOTSUPP		95		/* Operation not supported on transport endpoint */
-#define	FREERTOS_ERRNO_EADDRINUSE		98		/* Address already in use */
-#define	FREERTOS_ERRNO_EADDRNOTAVAIL	99		/* Cannot assign requested address */
-#define FREERTOS_ERRNO_ECONNRESET		104		/* Connection reset by peer */
-#define	FREERTOS_ERRNO_ENOBUFS			105		/* No buffer space available */
-#define	FREERTOS_ERRNO_EISCONN			106		/* Transport endpoint is already connected */
-#define	FREERTOS_ERRNO_ENOTCONN			107		/* Transport endpoint is not connected */
-#define	FREERTOS_ERRNO_ETIMEDOUT		110		/* Connection timed out */
-#define	FREERTOS_ERRNO_EALREADY			114		/* Operation already in progress */
-#define	FREERTOS_ERRNO_EINPROGRESS		115		/* Operation now in progress */
-#define	FREERTOS_ERRNO_ECANCELED		125		/* Operation Canceled */
 
 /* The number of octets in the MAC and IP addresses respectively. */
 #define ipMAC_ADDRESS_LENGTH_BYTES ( 6 )
@@ -116,7 +83,7 @@ extern "C" {
 /* Dimensions the buffers that are filled by received Ethernet frames. */
 #define ipSIZE_OF_ETH_CRC_BYTES					( 4UL )
 #define ipSIZE_OF_ETH_OPTIONAL_802_1Q_TAG_BYTES	( 4UL )
-#define ipTOTAL_ETHERNET_FRAME_SIZE				( ipconfigNETWORK_MTU + ipSIZE_OF_ETH_HEADER + ipSIZE_OF_ETH_CRC_BYTES + ipSIZE_OF_ETH_OPTIONAL_802_1Q_TAG_BYTES )
+#define ipTOTAL_ETHERNET_FRAME_SIZE				( ( ( uint32_t ) ipconfigNETWORK_MTU ) + ( ( uint32_t ) ipSIZE_OF_ETH_HEADER ) + ipSIZE_OF_ETH_CRC_BYTES + ipSIZE_OF_ETH_OPTIONAL_802_1Q_TAG_BYTES )
 
 
 /* Space left at the beginning of a network buffer storage area to store a
@@ -152,7 +119,7 @@ typedef struct xNETWORK_BUFFER
 	#if( ipconfigUSE_LINKED_RX_MESSAGES != 0 )
 		struct xNETWORK_BUFFER *pxNextBuffer; /* Possible optimisation for expert users - requires network driver support. */
 	#endif
-} xNetworkBufferDescriptor_t;
+} NetworkBufferDescriptor_t;
 
 #include "pack_struct_start.h"
 struct xMAC_ADDRESS
@@ -160,7 +127,7 @@ struct xMAC_ADDRESS
 	uint8_t ucBytes[ ipMAC_ADDRESS_LENGTH_BYTES ];
 }
 #include "pack_struct_end.h"
-typedef struct xMAC_ADDRESS xMACAddress_t;
+typedef struct xMAC_ADDRESS MACAddress_t;
 
 typedef enum eNETWORK_EVENTS
 {
@@ -176,7 +143,7 @@ typedef enum ePING_REPLY_STATUS
 } ePingReplyStatus_t;
 
 /* Endian related definitions. */
-#if( ipconfigBYTE_ORDER == FREERTOS_LITTLE_ENDIAN )
+#if( ipconfigBYTE_ORDER == pdFREERTOS_LITTLE_ENDIAN )
 
 	/* FreeRTOS_htons / FreeRTOS_htonl: some platforms might have built-in versions
 	using a single instruction so allow these versions to be overridden. */
@@ -202,12 +169,12 @@ typedef enum ePING_REPLY_STATUS
 	#define FreeRTOS_htons( x ) ( ( uint16_t ) ( x ) )
 	#define FreeRTOS_htonl( x ) ( ( uint32_t ) ( x ) )
 
-#endif /* ipconfigBYTE_ORDER == FREERTOS_LITTLE_ENDIAN */
+#endif /* ipconfigBYTE_ORDER == pdFREERTOS_LITTLE_ENDIAN */
 
 #define FreeRTOS_ntohs( x ) FreeRTOS_htons( x )
 #define FreeRTOS_ntohl( x ) FreeRTOS_htonl( x )
 
-#if ipconfigHAS_INLINE_FUNCTIONS
+#if( ipconfigHAS_INLINE_FUNCTIONS == 1 )
 
 	static portINLINE int32_t  FreeRTOS_max_int32  (int32_t  a, int32_t  b) { return a >= b ? a : b; }
 	static portINLINE uint32_t FreeRTOS_max_uint32 (uint32_t a, uint32_t b) { return a >= b ? a : b; }
@@ -285,6 +252,21 @@ void FreeRTOS_ClearARP( void );
 
 #endif /* ipconfigDHCP_REGISTER_HOSTNAME */
 
+
+/* For backward compatibility define old structure names to the newer equivalent
+structure name. */
+#ifndef ipconfigENABLE_BACKWARD_COMPATIBILITY
+	#define ipconfigENABLE_BACKWARD_COMPATIBILITY	1
+#endif
+
+#if( ipconfigENABLE_BACKWARD_COMPATIBILITY == 1 )
+	#define xIPStackEvent_t 			IPStackEvent_t
+	#define xNetworkBufferDescriptor_t 	NetworkBufferDescriptor_t
+	#define xMACAddress_t 				MACAddress_t
+	#define xWinProperties_t 			WinProperties_t
+	#define xSocket_t 					Socket_t
+	#define xSocketSet_t 				SocketSet_t
+#endif /* ipconfigENABLE_BACKWARD_COMPATIBILITY */
 
 #ifdef __cplusplus
 } /* extern "C" */

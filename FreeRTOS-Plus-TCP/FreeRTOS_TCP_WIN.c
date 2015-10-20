@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+TCP Labs Build 141019 (C) 2014 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -44,7 +44,8 @@
  * 1 tab == 4 spaces!
  *
  * http://www.FreeRTOS.org
- * http://www.FreeRTOS.org/udp
+ * http://www.FreeRTOS.org/plus
+ * http://www.FreeRTOS.org/labs
  *
  */
 
@@ -92,7 +93,7 @@
 	 * NOP (0x01), NOP (0x01), SACK (0x05), LEN (0x0a),
 	 * followed by a lower and a higher sequence number,
 	 * where LEN is 2 + 2*4 = 10 bytes. */
-	#define OPTION_CODE_SINGLE_SACK		( 0x0101050a )
+	#define OPTION_CODE_SINGLE_SACK		( 0x0101050aUL )
 
 	/* Normal retransmission:
 	 * A packet will be retransmitted after a Retransmit Time-Out (RTO).
@@ -270,12 +271,6 @@ static portINLINE void vListInsertFifo( List_t * const pxList, ListItem_t * cons
 }
 /*-----------------------------------------------------------*/
 
-static portINLINE void vListInsertStack( List_t * const pxList, ListItem_t * const pxNewListItem )
-{
-	vListInsertGeneric( pxList, pxNewListItem, (MiniListItem_t *)pxList->xListEnd.pxNext );
-}
-/*-----------------------------------------------------------*/
-
 static portINLINE void vTCPTimerSet( TcpTimer_t *pxTimer )
 {
 	pxTimer->ulBorn = xTaskGetTickCount ( );
@@ -391,8 +386,6 @@ void vListInsertGeneric( List_t * const pxList, ListItem_t * const pxNewListItem
 	{
 	TCPSegment_t *pxSegment;
 	ListItem_t * pxItem;
-
-		configASSERT( listLIST_IS_EMPTY( &xSegmentList ) == pdFALSE );
 
 		/* Allocate a new segment.  The socket will borrow all segments from a
 		common pool: 'xSegmentList', which is a list of 'TCPSegment_t' */
@@ -1043,7 +1036,7 @@ const int32_t l500ms = 500;
 
 		while( lBytesLeft > 0 )
 		{
-			/* The current transmission segment is full, create new segments a
+			/* The current transmission segment is full, create new segments as
 			needed. */
 			pxSegment = xTCPWindowTxNew( pxWindow, pxWindow->ulNextTxSequenceNumber, pxWindow->usMSS );
 

@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+TCP Labs Build 141019 (C) 2014 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -44,7 +44,8 @@
  * 1 tab == 4 spaces!
  *
  * http://www.FreeRTOS.org
- * http://www.FreeRTOS.org/udp
+ * http://www.FreeRTOS.org/plus
+ * http://www.FreeRTOS.org/labs
  *
  */
 
@@ -68,7 +69,7 @@
  * will be used when TCP data is received while earlier data is still missing.
  * If 'pucData' equals NULL, the function is called to advance 'lHead' only.
  */
-int32_t lStreamBufferAdd( xStreamBuffer *pxBuffer, int32_t lOffset, const uint8_t *pucData, int32_t lCount )
+int32_t lStreamBufferAdd( StreamBuffer_t *pxBuffer, int32_t lOffset, const uint8_t *pucData, int32_t lCount )
 {
 int32_t lSpace, lNextHead, lFirst;
 
@@ -151,7 +152,7 @@ int32_t lSpace, lNextHead, lFirst;
  * if 'xPeek' is pdTRUE, or if 'lOffset' is non-zero, the 'lTail' pointer will
  * not be advanced.
  */
-int32_t lStreamBufferGet( xStreamBuffer *pxBuffer, int32_t lOffset, uint8_t *pucData, int32_t lMaxCount, BaseType_t xPeek )
+int32_t lStreamBufferGet( StreamBuffer_t *pxBuffer, int32_t lOffset, uint8_t *pucData, int32_t lMaxCount, BaseType_t xPeek )
 {
 int32_t lSize, lCount, lFirst, lNextTail;
 

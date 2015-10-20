@@ -10,62 +10,78 @@
 #include "task.h"
 #include "semphr.h"
 
+
 /*
  * Ró¿ne
  */
 #include <string.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <strings.h>
+#include <stdlib.h>
 #include "stm32f4xx_hal.h"
 
 
-
+#define TX_BLOCKING_TIME	20
 
 
 /*
  * Variables
  */
 
+static xQueueHandle 	console_mngt_tx_queue;
+static xQueueHandle		console_mngt_rx_queue;
+static xSemaphoreHandle	console_mngt_txrdy_semph;
 
-static char was_hist;
+static console_mngt_t mngt_s;
 
-//tablica ze stringami komend
-static char tab_cmd[3][CMD_MAX_LEN];
-
-//tablica przetrzymujaca tablice struktur kolejno wpisanych komend
-static struct history com_cmd_hist[3] =
-{
-		{tab_cmd[0], 1},
-		{tab_cmd[1], 2},
-		{tab_cmd[2], 3},
-};
-
-//bufory dla leksemow polecenia konsoli
-char arg[MAX_LEX_COUNT][MAX_LEX_LEN];
-//dlugosc tablicy komend we flaszu
-short len_comm_act_tab;
-
-
-
-static xQueueHandle TxconsoleQueue;
-static xQueueHandle RxQueue;
-static xSemaphoreHandle Txconsole;
-
+const char EOT 		= 		0x04;
+const char BS		=		0x7f;
+const char LF		=		0x0a;
+const char CR_CM	=		0x0d;
+const char ETB		= 		0x17;
+const char ESC		=		0x1b;
+const char CMD_PRMT	=		0x3E;
 
 
 /*
  * Declarations
  */
-
-void przewinwtyl(struct history* cmd_hist, char* ptr_cmd_buf);
-
-void clean_term(char *ptr_cmd_buf);
-void add_to_history_cmd(struct history* cmd_hist, char* cmd);
-static void usart_put_string(char* string);
+static void usart_put_string(const char* string);
 static void usart_put_char(char byte);
+static void console_mngt_clear_line(console_mngt_t* ptr);
+static void console_mngt_interpreter(console_mngt_t* ptr,char len, void *tsm);
+static void console_mngt_clean_arg_buffers(void);
+static void console_mngt_cut_cmd_str(char *cmd_buf, char len);
 
+static void console_mngt_TxTask (void *pvparameters);
+static void console_mngt_RxTask (void *pvparameters);
 
+static void print_console_b(const char* b);
+void print_console(const char* string);
 
+void history_db_write(history_db_t* ptr,const char* data_ptr);
+void history_db_init(history_db_t* ptr );
+void history_db_deinit(history_db_t* ptr);
+char* history_db_read_back(history_db_t* ptr);
+char* history_db_read(history_db_t* ptr);
+char* history_db_read_not_mod(history_db_t* ptr);
 
+static inline void SET_TXE_INTERRUPT(void){
+	(USART6->CR1 |= USART_CR1_TXEIE);
+}
+static inline void CLR_TXE_INTERRUPT(void){
+	(USART6->CR1 &= ~USART_CR1_TXEIE);
+}
+
+static inline void SET_RXE_INTERRUPT(void){
+	(USART6->CR1 |= USART_CR1_RXNEIE);
+}
+
+static inline void CLR_RXE_INTERRUPT(void){
+	(USART6->CR1 &= ~USART_CR1_RXNEIE);
+}
 
 /*
  * Tablica zawierajaca komendy obslugiwane przez interpreter
@@ -114,88 +130,95 @@ void commlist_cmd(void *tsm)
 
 }
 
+inline static void print_prompt(console_mngt_t* ptr){
+	print_console_b("#");
+}
 
 
+void console_mngt_init(void)
+{
+	history_db_init(&mngt_s.history_db);
+
+	xTaskCreate(console_mngt_RxTask,"ConRxTask",512,&mngt_s,1,NULL);
+	xTaskCreate(console_mngt_TxTask,"ConTxTask",100,&mngt_s,0,NULL);
+
+}
 
 
 //Task wysylania znakow na konsole
 
-void vConsoleTxTask (void *pvparameters)
+static void console_mngt_TxTask (void *pvparameters)
 {
+	console_mngt_t* ptr = pvparameters;
 
 	//utworz kolejke znakow
-	TxconsoleQueue = xQueueCreate(RX_QUEUE_LENGTH, sizeof( portCHAR ) );
+	ptr->uart_tx_queue = xQueueCreate(TX_QUEUE_LENGTH, sizeof( portCHAR ) );
+	ptr->uart_tx_rdy_smph = xSemaphoreCreateBinary();
+	//xSemaphoreGive(ptr->uart_tx_rdy_smph);
 
-    //utworz semafor binarny blokujacy czytanie z kolejki
-	Txconsole=xSemaphoreCreateMutex();
-
-
-
+	console_mngt_tx_queue = ptr->uart_tx_queue;
 	portCHAR cRxedChar;
 
+	//SET_TXE_INTERRUPT();
 
     while(1)
-	    {
-    	//vTaskDelay(10 / portTICK_RATE_MS);
-	        //czekaj az kos wywola funkcje print_c...(...) i wywola ten semafor
-	        if(xSemaphoreTake(Txconsole,portMAX_DELAY ))
-	       {
-	            while((xQueueReceive( TxconsoleQueue,  &cRxedChar, 0) == pdTRUE))
-	            {
-	            	  usart_put_char(cRxedChar);
+	{
+	  while((xQueueReceive( ptr->uart_tx_queue,  &cRxedChar, 200) == pdTRUE)){
+	     usart_put_char(cRxedChar);
+	  }
 
-	           }
-
-
-
-	       }
-	    }
+	}
 }
-void print_console (char const * string)
+
+void print_console(const char* string)
 {
-
-
-		if(TxconsoleQueue && Txconsole )
+		/*if(console_mngt_tx_queue)
 		{
 			// wpis do kolejki
-
-			for(; *string!= 0; string++)
-			{
-				xQueueSend( TxconsoleQueue, ( void * ) string, 10 );
+			for(; *string!= 0; string++){
+				xQueueSend( console_mngt_tx_queue, ( void * ) string, TX_BLOCKING_TIME ); // silently ignore error
 			}
 
-			//ustaw semafor, watek ConsoleTaskTx bedzie mogl wyslac dane
-			xSemaphoreGive(Txconsole);
 		}
-		else
-		{
+		else*/{
 			usart_put_string(string);
 		}
+}
+
+static void print_console_b(const char* b){
+
+	if(console_mngt_tx_queue){
+		xQueueSend( console_mngt_tx_queue, b, TX_BLOCKING_TIME ); // silently ignore error
+	}
+	else{
+		usart_put_char(*b);
+	}
+
 }
 
 
 
 
 // Task odbioru i analizy znakow z konsoli
-void vConsoleRxTask (void *pvparameters){
+static void console_mngt_RxTask (void *pvparameters){
 
+	console_mngt_t* mngt_ptr = (console_mngt_t*)pvparameters;
 
 	char special=0;
-	char i = 0;
+	uint8_t i = 0;
 
-	char command_buffer[CMD_MAX_LEN];
-	char *ptr_cmd_buf = command_buffer;
 	char onechar;
 
 	//utworz kolejke znakow
-	RxQueue = xQueueCreate(100, sizeof( portCHAR ) );
+	mngt_ptr->uart_rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof( portCHAR ) );
+	console_mngt_rx_queue = mngt_ptr->uart_rx_queue;
 
+	SET_RXE_INTERRUPT();
 
 	for (;;)
 	{
 
-		//vTaskDelay(10 / portTICK_RATE_MS);
-		while(xQueueReceive(RxQueue,&onechar,portMAX_DELAY))
+		while(xQueueReceive(mngt_ptr->uart_rx_queue,&onechar,portMAX_DELAY)==pdTRUE)
 		{
 
 			  // sprawdzamy wstepnie czy to znak specjalny (wszelkie strzalki, delete)
@@ -206,20 +229,43 @@ void vConsoleRxTask (void *pvparameters){
 			                else if (special && onechar == 0x41 )
 			                {
 			                    //skasuj wyswietlona z historii komende i przygotuj dla poprzedniej
-			                    clean_term(ptr_cmd_buf);
-			                    //wczytaj poprzednia komende
-			                    przewinwtyl(com_cmd_hist, ptr_cmd_buf);
+			                    console_mngt_clear_line(mngt_ptr);
+
+			                    strcpy(mngt_ptr->cmd_buf,history_db_read(&mngt_ptr->history_db));
 
 			                    //wyswietla te komnde na rs
-			                    print_console(ptr_cmd_buf);
+			                    print_console(mngt_ptr->cmd_buf);
 
 						        //print_char(0, user.prom(&user));
-			                    i= (char)strlen(ptr_cmd_buf);
+			                    i= strlen(mngt_ptr->cmd_buf);
+
+			                    mngt_ptr->current_cmd_len = i;
 
 			                    // deaktywacja sekwencji sterujacej
 			                    special = 0;
 
 			                }
+			                // to jest magiczna strzalka w dol
+			                else if (special && onechar == 0x42 )
+			                {
+			                    //skasuj wyswietlona z historii komende i przygotuj dla poprzedniej
+			                    console_mngt_clear_line(mngt_ptr);
+
+			                    strcpy(mngt_ptr->cmd_buf,history_db_read_back(&mngt_ptr->history_db));
+
+			                    //wyswietla te komnde na rs
+			                    print_console(mngt_ptr->cmd_buf);
+
+						        //print_char(0, user.prom(&user));
+			                    i= strlen(mngt_ptr->cmd_buf);
+
+			                    mngt_ptr->current_cmd_len = i;
+
+			                    // deaktywacja sekwencji sterujacej
+			                    special = 0;
+
+			                }
+
 
 			                //przyjmuj tylko znaki z przedzialu a-z 0-9 spacja, enter, backspace,itd.
 			                //uwaga na strzalki, wysylaja po 2 znaki: A+costam oraz B+costam
@@ -232,13 +278,12 @@ void vConsoleRxTask (void *pvparameters){
 			                        onechar == '@' )&&(!special)  )
 			                {
 			                    //echo dla wpisanego znaku
-			                	usart_put_char(onechar);
+			                	print_console_b(&onechar);
 
 			                    //zabezpieczenie przed przekroczeniem tablicy
-			                    if(i < CMD_MAX_LEN)
-			                    {
-			                        *(ptr_cmd_buf + i) = onechar;
-			                        i++;
+			                    if(i < DB_CMD_MAX_LEN){
+			                        mngt_ptr->cmd_buf[i++] = onechar;
+			                        mngt_ptr->current_cmd_len++;
 			                    }
 			                }
 
@@ -247,15 +292,13 @@ void vConsoleRxTask (void *pvparameters){
 			                {
 			                    //sprawdz czy index jest jeszcze w dopuszczlnym obszarze,
 			                    //z lewej i z prawej strony
-			                    if(i > 0 && i < CMD_MAX_LEN)
+			                    if(i > 0 && i < DB_CMD_MAX_LEN)
 			                    {
-			                    	usart_put_char(BS);
+			                    	print_console_b(&BS);
 
-			                        //wyczysc ostatni znak
-			                        *(ptr_cmd_buf + i) = 0x0;
-			                        //przesun o 1 do tylu aktualny indeks bufora
-			                        i--;
-
+			                        //wyczysc ostatni znak i przesun znak
+			                    	mngt_ptr->cmd_buf[i--] = 0x0;
+			                    	mngt_ptr->current_cmd_len--;
 			                    }
 			                }
 			                //jesli jakikolwiek inny klawisz ze znakow specjalnych
@@ -265,23 +308,18 @@ void vConsoleRxTask (void *pvparameters){
 			                else if (onechar == EOT || onechar ==LF ||
 			                		onechar ==CR_CM || onechar==ETB)
 			                {
-			                	//usart_put_string("\r\n");
-			                	//usart_put_char((char*)LF);
-			                	//usart_put_char((char*)CMD_PRMT);
-			                    //zakoncz c-stringa znakiem konca= '\0'
-			                    *(ptr_cmd_buf + i) = '\0';
+			                	mngt_ptr->cmd_buf[i] = '\0';
 
-			                    //skopiuj te komende do kolejki przyjetych komend
-			                    //add_to_history_cmd(com_cmd_hist, ptr_cmd_buf);
+			                	//mngt_ptr->current_cmd_len = strlen(mngt_ptr->cmd_buf);
+
+			                    //history_db_write(&mngt_ptr->history_db_ptr,mngt_ptr->cmd_buf);
 			                    //interpretacja komend
-			                    interpreter(ptr_cmd_buf, i, NULL,ptr_cmd_buf);
-
+			                    console_mngt_interpreter(mngt_ptr, i, NULL);
 
 			                    //przygotuj indeks pod nastepna komende na poczatek bufora
 			                    i= 0;
 
-			                    //byl ENTER, wiec ustaw ze nie kasuje nic STRZALKA W GORE wypisujaca z historii
-			                    was_hist = 0;
+
 			                }
 			            }
 			        }
@@ -289,113 +327,43 @@ void vConsoleRxTask (void *pvparameters){
 
 }
 
-//dodaje konende do historii
-void add_to_history_cmd(struct history* cmd_hist , char* cmd)
+//czysci linie terminalu
+static void console_mngt_clear_line(console_mngt_t* ptr)
 {
+		uint8_t cnt;
+		for(cnt=0;  cnt < ptr->current_cmd_len;cnt++){
+			print_console_b(&BS);
 
-
-
-	int i=0, j=0;
-
-	//przesun wszystkie komendy o 1 i zapisz pod 0 aktualna, zmien z 0=>3
-	for ( ; i< 3; i++)
-	{
-		cmd_hist[i].no--;
-	}
-
-	for ( ; j< 3; j++)
-	{
-		if(cmd_hist[j].no == 0)
-		{
-			strncpy(cmd_hist[j].cmd, cmd, CMD_MAX_LEN);
-			cmd_hist[j].no = 3;
-			break;
 		}
-	}
-
-}
-
-
-//odnajduje ostatnio wpisana komende
-void przewinwtyl(struct history* cmd_hist, char* ptr_cmd_buf)
-{
-
-
-
-
-	int j=0;
-	//przetrzymuje indeks cofnietej komendy
-	static char last_id = 3;
-
-	//znajdz najwiekszy indeks
-	for ( ; j< 3; j++)
-	{
-		if(cmd_hist[j].no == last_id)
-		{
-
-			//skopiuj do bufora wywolywania komend
-			strncpy(ptr_cmd_buf, cmd_hist[j].cmd, CMD_MAX_LEN);
-			//dekrementuj indeks dla wczesniejszej komendy
-			last_id--;
-			//jesli dejdziemy do zera => zawroc
-			if(!last_id)
-				last_id = 3;
-			break;
-		}
-	}
-
-
-}
-
-
-//czysc terminal jesli bylo kolejne wywolanie STRZALKI W GORE
-void clean_term(char *ptr_cmd_buf)
-{
-	//czysc terminal teraz
-	if (was_hist)
-	{
-		short len_back=0;
-		len_back = (short)strlen(ptr_cmd_buf);
-
-		for(; len_back >0; len_back--)
-		{
-			//wyczysc terminal
-			//przesow na konsoli
-			usart_put_char(BS);
-		}
-
-		return;
-	}
-
-	//ustaw na przyszlosc
-	was_hist = 1;
+		//print_prompt(ptr);
 }
 
 //czysci bufory leksemow dla nowej komendy
-void clean_arg_buffers()
+static void console_mngt_clean_arg_buffers(void)
 {
-	memset(&arg[0], 0x0, MAX_LEX_LEN);
-	memset(&arg[1], 0x0, MAX_LEX_LEN);
-	memset(&arg[2], 0x0, MAX_LEX_LEN);
-	memset(&arg[3], 0x0, MAX_LEX_LEN);
-	memset(&arg[4], 0x0, MAX_LEX_LEN);
+	uint8_t cnt;
+
+	for(cnt=0;cnt<DB_COUNT;cnt++){
+
+		memset(&arg[cnt], 0x0, DB_CMD_MAX_LEN);
+	}
 
 }
 
 
-void cut_cmd_str(char *cmd_buf, char len)
+static void console_mngt_cut_cmd_str(char *cmd_buf, char len)
 {
-	short i;
+	uint8_t i;
 	char* tok_ptr;
 
 	//wyczysc bufory arg dla nowej komendy
-	clean_arg_buffers();
+	console_mngt_clean_arg_buffers();
 
 	tok_ptr = strtok(cmd_buf, " ");
 
-	for(i=0; i< MAX_LEX_COUNT && tok_ptr!=NULL; i++)
+	for(i=0; i< DB_CMD_MAX_LEN && tok_ptr!=NULL; i++)
 	{
-		strncpy(&arg[i][0], tok_ptr, MAX_LEX_LEN-1);
+		strncpy(&arg[i][0], tok_ptr, DB_CMD_MAX_LEN-1);
 
 		//zwraca NULL jesli nie znalazl znaku rozdzielajacego: ' '
 		tok_ptr = strtok(NULL, " ");
@@ -403,51 +371,49 @@ void cut_cmd_str(char *cmd_buf, char len)
 	}
 }
 
-void interpreter(char *cmd_buf, char len, void *tsm, char* cmd)
+static void console_mngt_interpreter(console_mngt_t* ptr,char len, void *tsm)
 {
-    int i=0;
+    uint32_t i=0;
+    char cmd_buff_tmp[DB_CMD_MAX_LEN];
 
-    int cmd_len =  sizeof(comm_act)/sizeof(_action_command);
+    strcpy(cmd_buff_tmp,ptr->cmd_buf);
 
     //potnij stringi wzgledem spacji
-    cut_cmd_str(cmd_buf, len);
+    console_mngt_cut_cmd_str(ptr->cmd_buf, len);
 
-    //nic nie wpisane, tylko ENTER poszedl ???[lp]
-    if(!arg[0][0]){
-       // char str[3] = {' ', 0x08, "\0"}; //spacja, backspace, koniec stringa
-        //wyslij spacje i skasuj ja
+    //tylko enter
+    if(!*arg[0]){
+
         print_console("\r\n");
-        //po tym wyslij znak zachety
         goto PROMPT;
     }
 
-    // skopiuj komende tylko jesli bylo cos wpisane, sam enter pomija
-    add_to_history_cmd(com_cmd_hist, cmd);
+    if(strcmp(cmd_buff_tmp,history_db_read_not_mod(&ptr->history_db))){
+    	history_db_write(&ptr->history_db,cmd_buff_tmp);
+    }
+
+
+
+    //TODO: wrzucic tutaj jakis wydajniejszy algorytm
 
     //przeszukaj cala tablice komend
-    for (; i< cmd_len; i++)
+    for (; i< sizeof(comm_act)/sizeof(_action_command); i++)
     {
+        if(strncmp((char*)comm_act[i].command, arg[0], DB_CMD_MAX_LEN) == 0){
 
-        if(strncmp((char*)comm_act[i].command, arg[0], MAX_LEX_LEN) == 0)    break;
+        	print_console("\r\n");
+        	comm_act[i].action(tsm);
+        	goto PROMPT;
+        }
     }
+    //nie podejmuj akcji, komenda nierozpoznana
+    print_console(cmd_not_found);
 
-    //wykonaj komende, jesli wyskoczyl z petli przez: break;
-    if(i<cmd_len)
-    {
-    	print_console("\r\n");
-        comm_act[i].action(tsm);
-    }
-    else
-    {
-        //nie podejmuj akcji, komenda nierozpoznana
-    	print_console(cmd_not_found);
-
-    }
-
-PROMPT:
-    print_console(">");
+	PROMPT:
+	print_prompt(ptr);
 
 }
+
 
 void usart_init(uint32_t baudrate)
 {
@@ -471,11 +437,12 @@ void usart_init(uint32_t baudrate)
 	 HAL_GPIO_Init(GPIOC,&Rx_pin);
 	 HAL_GPIO_Init(GPIOC,&TX_pin);
 
-
+	 CLR_RXE_INTERRUPT();
+	 CLR_TXE_INTERRUPT();
 
 	 USART6->BRR = APB2_FREQ/baudrate;
 
-	 USART6->CR1 |= USART_CR1_RXNEIE | USART_CR1_TE | USART_CR1_RE | USART_CR1_UE ;
+	 USART6->CR1 |= USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
 
 	 NVIC_SetPriority(USART6_IRQn,10);
 	 NVIC_EnableIRQ(USART6_IRQn);
@@ -483,14 +450,25 @@ void usart_init(uint32_t baudrate)
 
 static void usart_put_char(char byte)
 {
+/*
+	if(console_mngt_txrdy_semph && xSemaphoreTake(console_mngt_txrdy_semph,20)==pdPASS)
+	{
+		SET_TXE_INTERRUPT();
+		taskENTER_CRITICAL();
+		USART6->DR = (uint32_t)byte;
+		taskEXIT_CRITICAL();
+	}
+	else*/{
 
-	USART6->DR = (uint32_t)byte;
+		USART6->DR = (uint32_t)byte;
+		while(!(USART6->SR & USART_SR_TXE));
 
-	while(!(USART6->SR & USART_SR_TC));
+	}
+
 
 }
 
-static void usart_put_string(char* string)
+static void usart_put_string(const char* string)
 {
 
 
@@ -504,21 +482,161 @@ static void usart_put_string(char* string)
 
 
 // RX USART interrupt
-void USART6_IRQHandler()
+void USART6_IRQHandler(void)
 {
+	int8_t onechar;
 
-	char onechar;
 	long lHigherPriorityTaskWoken = pdFALSE;
 
-	GPIOD->ODR ^=GPIO_ODR_ODR_14;
-	onechar=(char) USART6->DR;
+	if(USART6->SR & USART_SR_RXNE) // RX interrupt
+	{
+		GPIOD->ODR ^=GPIO_ODR_ODR_14;
+		onechar=(char) USART6->DR;
 
-	xQueueSendFromISR(RxQueue,&onechar,&lHigherPriorityTaskWoken);
+		xQueueSendFromISR(console_mngt_rx_queue,&onechar,&lHigherPriorityTaskWoken);
+
+
+	}
+
+	if(USART6->SR & USART_SR_ORE) // overrun interrupt
+	{
+		onechar=(char) USART6->DR;
+	}
+
+	//if(USART6->SR & USART_SR_TXE) // data register empty
+	//{
+		//xSemaphoreGiveFromISR(console_mngt_txrdy_semph,&lHigherPriorityTaskWoken);
+	//	CLR_TXE_INTERRUPT();
+
+	//}
+	/*
+	if(USART6->SR & USART_SR_TC) // trasmit complete interrupt
+	{
+
+		dummy = USART6->SR;
+		//USART6->DR = (uint32_t)dummy;
+
+
+
+	}*/
+
 
 	portEND_SWITCHING_ISR( lHigherPriorityTaskWoken );
 
+}
 
 
+
+/*
+ * Struktury obslugujace historie komend i przewijanie
+ */
+
+extern inline void history_db_set_rd_to_beg(history_db_t* ptr);
+
+//static allocation of history db
+void history_db_init(history_db_t* ptr )
+{
+	uint8_t cnt;
+	for(cnt=0;cnt<DB_COUNT;cnt++){
+		ptr->data_ptr[cnt]=NULL;
+	}
+	//ptr->data_ptr = history_db;
+	ptr->RD_p = 0;
+	ptr->WR_p = 0;
+	ptr->is_empty = true;
+	ptr->is_full = false;
+	ptr->size = 0;
+	ptr->count = DB_COUNT;
+
+}
+
+void history_db_deinit(history_db_t* ptr)
+{
+	uint8_t cnt;
+	for(cnt=0;cnt<DB_COUNT;cnt++){
+			free(ptr->data_ptr[cnt]);
+		}
+	free(ptr);
+}
+
+void history_db_write(history_db_t* ptr,const char* data_ptr)
+{
+	if(ptr->data_ptr[ptr->WR_p]){
+		ptr->size -=(strlen(ptr->data_ptr[ptr->WR_p])+1);
+		free(ptr->data_ptr[ptr->WR_p]);
+		ptr->data_ptr[ptr->WR_p] = calloc(strlen(data_ptr)+1,sizeof(char));
+		ptr->size +=(strlen(data_ptr)+1);
+	}
+	else{
+		ptr->data_ptr[ptr->WR_p] = calloc(strlen(data_ptr)+1,sizeof(char));
+		ptr->size +=(strlen(data_ptr)+1);
+	}
+
+	memcpy(ptr->data_ptr[ptr->WR_p],data_ptr,strlen(data_ptr)+1);
+
+	ptr->RD_p = ptr->WR_p;
+
+	ptr->WR_p++;
+
+	if(ptr->WR_p == ptr->count){ //todo: write pointer przekracza tablice
+			ptr->is_full = true;
+			ptr->WR_p = 0;
+	}
+
+}
+char* history_db_read_not_mod(history_db_t* ptr)
+{
+
+	//if(!ptr->RD_p)
+		return ptr->data_ptr[ptr->RD_p];
+	//else
+		//return ptr->data_ptr[ptr->RD_p-1];
+}
+
+char* history_db_read(history_db_t* ptr)
+{
+
+
+	/*if((!ptr->RD_p) || !(*ptr->data_ptr[ptr->RD_p])){
+
+				if(!ptr->WR_p && ptr->data_ptr[DB_COUNT-1])
+					ptr->RD_p = DB_COUNT-1;
+				else if (!ptr->WR_p)
+					ptr->RD_p = ptr->WR_p;
+				else
+					ptr->RD_p = ptr->WR_p-1;
+	}*/
+
+	if(ptr->RD_p && (ptr->RD_p < DB_COUNT)){
+
+		ptr->RD_p--;
+		return ptr->data_ptr[ptr->RD_p];
+	}
+	else if(ptr->RD_p == 0) return ptr->data_ptr[ptr->RD_p];
+
+
+}
+
+char* history_db_read_back(history_db_t* ptr)
+{
+	if((ptr->RD_p < DB_COUNT) && (*ptr->data_ptr[ptr->RD_p]) ){
+		ptr->RD_p++;
+		return ptr->data_ptr[ptr->RD_p];
+	}
+	else return ptr->data_ptr[ptr->RD_p-1];
+
+/*
+	if((ptr->RD_p==ptr->WR_p) || !(*ptr->data_ptr[ptr->RD_p])){
+				ptr->RD_p = 0;
+		}
+*/
+
+
+}
+
+inline void history_db_set_rd_to_beg(history_db_t* ptr)
+{
+	ptr->RD_p = ptr->WR_p;
 }
 
 

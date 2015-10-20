@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+TCP Labs Build 141019 (C) 2014 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -44,7 +44,8 @@
  * 1 tab == 4 spaces!
  *
  * http://www.FreeRTOS.org
- * http://www.FreeRTOS.org/udp
+ * http://www.FreeRTOS.org/plus
+ * http://www.FreeRTOS.org/labs
  *
  */
 
@@ -74,7 +75,7 @@ typedef struct xNetworkAddressingParameters
 	uint32_t ulGatewayAddress;
 	uint32_t ulDNSServerAddress;
 	uint32_t ulBroadcastAddress;
-} xNetworkAddressingParameters_t;
+} NetworkAddressingParameters_t;
 
 extern BaseType_t xTCPWindowLoggingLevel;
 
@@ -85,12 +86,12 @@ extern BaseType_t xTCPWindowLoggingLevel;
 #include "pack_struct_start.h"
 struct xETH_HEADER
 {
-	xMACAddress_t xDestinationAddress; /*  0 + 6 = 6  */
-	xMACAddress_t xSourceAddress;      /*  6 + 6 = 12 */
+	MACAddress_t xDestinationAddress; /*  0 + 6 = 6  */
+	MACAddress_t xSourceAddress;      /*  6 + 6 = 12 */
 	uint16_t usFrameType;              /* 12 + 2 = 14 */
 }
 #include "pack_struct_end.h"
-typedef struct xETH_HEADER xEthernetHeader_t;
+typedef struct xETH_HEADER EthernetHeader_t;
 
 #include "pack_struct_start.h"
 struct xARP_HEADER
@@ -100,13 +101,13 @@ struct xARP_HEADER
 	uint8_t ucHardwareAddressLength;		/*  4 +  1 =  5 */
 	uint8_t ucProtocolAddressLength;		/*  5 +  1 =  6 */
 	uint16_t usOperation;					/*  6 +  2 =  8 */
-	xMACAddress_t xSenderHardwareAddress;	/*  8 +  6 = 14 */
+	MACAddress_t xSenderHardwareAddress;	/*  8 +  6 = 14 */
 	uint32_t ulSenderProtocolAddress;		/* 14 +  4 = 18  */
-	xMACAddress_t xTargetHardwareAddress;	/* 18 +  6 = 24  */
+	MACAddress_t xTargetHardwareAddress;	/* 18 +  6 = 24  */
 	uint32_t ulTargetProtocolAddress;		/* 24 +  4 = 28  */
 }
 #include "pack_struct_end.h"
-typedef struct xARP_HEADER xARPHeader_t;
+typedef struct xARP_HEADER ARPHeader_t;
 
 #include "pack_struct_start.h"
 struct xIP_HEADER
@@ -123,7 +124,7 @@ struct xIP_HEADER
 	uint32_t ulDestinationIPAddress;      /* 16 + 4 = 20 */
 }
 #include "pack_struct_end.h"
-typedef struct xIP_HEADER xIPHeader_t;
+typedef struct xIP_HEADER IPHeader_t;
 
 #include "pack_struct_start.h"
 struct xIGMP_HEADER
@@ -134,7 +135,7 @@ struct xIGMP_HEADER
 	uint32_t usGroupAddress;   /* 4 + 4 = 8 */
 }
 #include "pack_struct_end.h"
-typedef struct xIGMP_HEADER xIGMPHeader_t;
+typedef struct xIGMP_HEADER IGMPHeader_t;
 
 #include "pack_struct_start.h"
 struct xICMP_HEADER
@@ -146,7 +147,7 @@ struct xICMP_HEADER
 	uint16_t usSequenceNumber; /* 6 + 2 = 8 */
 }
 #include "pack_struct_end.h"
-typedef struct xICMP_HEADER xICMPHeader_t;
+typedef struct xICMP_HEADER ICMPHeader_t;
 
 #include "pack_struct_start.h"
 struct xUDP_HEADER
@@ -157,7 +158,7 @@ struct xUDP_HEADER
 	uint16_t usChecksum;        /* 6 + 2 = 8 */
 }
 #include "pack_struct_end.h"
-typedef struct xUDP_HEADER xUDPHeader_t;
+typedef struct xUDP_HEADER UDPHeader_t;
 
 #include "pack_struct_start.h"
 struct xTCP_HEADER
@@ -177,7 +178,7 @@ struct xTCP_HEADER
 #endif
 }
 #include "pack_struct_end.h"
-typedef struct xTCP_HEADER xTCPHeader_t;
+typedef struct xTCP_HEADER TCPHeader_t;
 
 #include "pack_struct_start.h"
 struct xPSEUDO_HEADER
@@ -189,7 +190,7 @@ struct xPSEUDO_HEADER
 	uint16_t usUDPLength;
 }
 #include "pack_struct_end.h"
-typedef struct xPSEUDO_HEADER xPseudoHeader_t;
+typedef struct xPSEUDO_HEADER PseudoHeader_t;
 
 /*-----------------------------------------------------------*/
 /* Nested protocol packets.                                  */
@@ -198,58 +199,58 @@ typedef struct xPSEUDO_HEADER xPseudoHeader_t;
 #include "pack_struct_start.h"
 struct xARP_PACKET
 {
-	xEthernetHeader_t xEthernetHeader;	/*  0 + 14 = 14 */
-	xARPHeader_t xARPHeader;			/* 14 + 28 = 42 */
+	EthernetHeader_t xEthernetHeader;	/*  0 + 14 = 14 */
+	ARPHeader_t xARPHeader;			/* 14 + 28 = 42 */
 }
 #include "pack_struct_end.h"
-typedef struct xARP_PACKET xARPPacket_t;
+typedef struct xARP_PACKET ARPPacket_t;
 
 #include "pack_struct_start.h"
 struct xIP_PACKET
 {
-	xEthernetHeader_t xEthernetHeader;
-	xIPHeader_t xIPHeader;
+	EthernetHeader_t xEthernetHeader;
+	IPHeader_t xIPHeader;
 }
 #include "pack_struct_end.h"
-typedef struct xIP_PACKET xIPPacket_t;
+typedef struct xIP_PACKET IPPacket_t;
 
 #include "pack_struct_start.h"
 struct xICMP_PACKET
 {
-	xEthernetHeader_t xEthernetHeader;
-	xIPHeader_t xIPHeader;
-	xICMPHeader_t xICMPHeader;
+	EthernetHeader_t xEthernetHeader;
+	IPHeader_t xIPHeader;
+	ICMPHeader_t xICMPHeader;
 }
 #include "pack_struct_end.h"
-typedef struct xICMP_PACKET xICMPPacket_t;
+typedef struct xICMP_PACKET ICMPPacket_t;
 
 #include "pack_struct_start.h"
 struct xUDP_PACKET
 {
-	xEthernetHeader_t xEthernetHeader; /*  0 + 14 = 14 */
-	xIPHeader_t xIPHeader;             /* 14 + 20 = 34 */
-	xUDPHeader_t xUDPHeader;           /* 34 +  8 = 42 */
+	EthernetHeader_t xEthernetHeader; /*  0 + 14 = 14 */
+	IPHeader_t xIPHeader;             /* 14 + 20 = 34 */
+	UDPHeader_t xUDPHeader;           /* 34 +  8 = 42 */
 }
 #include "pack_struct_end.h"
-typedef struct xUDP_PACKET xUDPPacket_t;
+typedef struct xUDP_PACKET UDPPacket_t;
 
 #include "pack_struct_start.h"
 struct xTCP_PACKET
 {
-	xEthernetHeader_t xEthernetHeader; /*  0 + 14 = 14 */
-	xIPHeader_t xIPHeader;             /* 14 + 20 = 34 */
-	xTCPHeader_t xTCPHeader;           /* 34 + 32 = 66 */
+	EthernetHeader_t xEthernetHeader; /*  0 + 14 = 14 */
+	IPHeader_t xIPHeader;             /* 14 + 20 = 34 */
+	TCPHeader_t xTCPHeader;           /* 34 + 32 = 66 */
 }
 #include "pack_struct_end.h"
-typedef struct xTCP_PACKET xTCPPacket_t;
+typedef struct xTCP_PACKET TCPPacket_t;
 
 typedef union XPROT_PACKET
 {
-	xARPPacket_t xARPPacket;
-	xTCPPacket_t xTCPPacket;
-	xUDPPacket_t xUDPPacket;
-	xICMPPacket_t xICMPPacket;
-} xProtPacket_t;
+	ARPPacket_t xARPPacket;
+	TCPPacket_t xTCPPacket;
+	UDPPacket_t xUDPPacket;
+	ICMPPacket_t xICMPPacket;
+} ProtocolPacket_t;
 
 
 /* The maximum UDP payload length. */
@@ -271,19 +272,19 @@ typedef enum
 	eARPTimerEvent,			/* 2: The ARP timer expired. */
 	eStackTxEvent,			/* 3: The software stack has queued a packet to transmit. */
 	eDHCPEvent,				/* 4: Process the DHCP state machine. */
-	eTCPTimerEvent,			/* 5: See if any TCP socket needs attention */
-	eTCPAcceptEvent,		/* 6: Client API FreeRTOS_accept() asking if there is a new client */
-	eTCPNetStat,			/* 7: IP-task is asked to produce a netstat listing */
-	eSocketBindEvent,		/* 8: Send a message to the IP-task to bind a socket to a port */
-	eSocketCloseEvent,		/* 9: Send a message to the IP-task to close a socket */
-	eSocketSelectEvent,		/*10: Send a message to the IP-task for select() */
+	eTCPTimerEvent,			/* 5: See if any TCP socket needs attention. */
+	eTCPAcceptEvent,		/* 6: Client API FreeRTOS_accept() waiting for client connections. */
+	eTCPNetStat,			/* 7: IP-task is asked to produce a netstat listing. */
+	eSocketBindEvent,		/* 8: Send a message to the IP-task to bind a socket to a port. */
+	eSocketCloseEvent,		/* 9: Send a message to the IP-task to close a socket. */
+	eSocketSelectEvent,		/*10: Send a message to the IP-task for select(). */
 } eIPEvent_t;
 
 typedef struct IP_TASK_COMMANDS
 {
 	eIPEvent_t eEventType;
 	void *pvData;
-} xIPStackEvent_t;
+} IPStackEvent_t;
 
 #define ipBROADCAST_IP_ADDRESS 0xffffffffUL
 
@@ -298,10 +299,10 @@ setting. */
 #define ipGET_UDP_PAYLOAD_OFFSET_FOR_FRAGMENT( usFragmentOffset ) ( ( ( usFragmentOffset ) == 0 ) ? ipUDP_PAYLOAD_OFFSET : ipIP_PAYLOAD_OFFSET )
 
 /* The offset into a UDP packet at which the UDP data (payload) starts. */
-#define ipUDP_PAYLOAD_OFFSET	( sizeof( xUDPPacket_t ) )
+#define ipUDP_PAYLOAD_OFFSET	( sizeof( UDPPacket_t ) )
 
 /* The offset into an IP packet into which the IP data (payload) starts. */
-#define ipIP_PAYLOAD_OFFSET		( sizeof( xIPPacket_t ) )
+#define ipIP_PAYLOAD_OFFSET		( sizeof( IPPacket_t ) )
 
 #include "pack_struct_start.h"
 struct xUDP_IP_FRAGMENT_PARAMETERS
@@ -313,9 +314,9 @@ struct xUDP_IP_FRAGMENT_PARAMETERS
 	uint16_t usPayloadChecksum;
 }
 #include "pack_struct_end.h"
-typedef struct xUDP_IP_FRAGMENT_PARAMETERS xIPFragmentParameters_t;
+typedef struct xUDP_IP_FRAGMENT_PARAMETERS IPFragmentParameters_t;
 
-#if( ipconfigBYTE_ORDER == FREERTOS_LITTLE_ENDIAN )
+#if( ipconfigBYTE_ORDER == pdFREERTOS_LITTLE_ENDIAN )
 
 	/* Ethernet frame types. */
 	#define ipARP_TYPE	( 0x0608U )
@@ -339,23 +340,29 @@ typedef struct xUDP_IP_FRAGMENT_PARAMETERS xIPFragmentParameters_t;
 	#define ipARP_REQUEST ( 0x0001 )
 	#define ipARP_REPLY ( 0x0002 )
 
-#endif /* ipconfigBYTE_ORDER == FREERTOS_LITTLE_ENDIAN */
+#endif /* ipconfigBYTE_ORDER == pdFREERTOS_LITTLE_ENDIAN */
 
 
 /* For convenience, a MAC address of all zeros and another of all 0xffs are
 defined const for quick reference. */
-extern const xMACAddress_t xBroadcastMACAddress; /* all 0xff's */
+extern const MACAddress_t xBroadcastMACAddress; /* all 0xff's */
 extern uint16_t usPacketIdentifier;
 
 /* Define a default UDP packet header (declared in FreeRTOS_UDP_IP.c) */
-typedef union _UdpPacketHeader {
+typedef union _UdpPacketHeader
+{
 	uint8_t ucBytes[24];
 	uint32_t ulWords[6];
-} UdpPacketHeader_t;
-extern UdpPacketHeader_t xDefaultPartUDPPacketHeader;
+} UDPPacketHeader_t;
+extern UDPPacketHeader_t xDefaultPartUDPPacketHeader;
 
 /* Structure that stores the netmask, gateway address and DNS server addresses. */
-extern xNetworkAddressingParameters_t xNetworkAddressing;
+extern NetworkAddressingParameters_t xNetworkAddressing;
+
+/* Structure that stores the defaults for netmask, gateway address and DNS.
+These values will be copied to 'xNetworkAddressing' in case DHCP is not used,
+and also in case DHCP does not lead to a confirmed request. */
+extern NetworkAddressingParameters_t xDefaultAddressing;
 
 /* True when BufferAllocation_1.c was included, false for BufferAllocation_2.c */
 extern const BaseType_t xBufferAllocFixedSize;
@@ -438,7 +445,7 @@ BaseType_t FreeRTOS_NetworkDownFromISR( void );
 /*
  * Processes incoming ARP packets.
  */
-eFrameProcessingResult_t eARPProcessPacket( xARPPacket_t * const pxARPFrame );
+eFrameProcessingResult_t eARPProcessPacket( ARPPacket_t * const pxARPFrame );
 
 /*
  * Inspect an Ethernet frame to see if it contains data that the stack needs to
@@ -452,11 +459,8 @@ eFrameProcessingResult_t eConsiderFrameForProcessing( const uint8_t * const pucE
  */
 uint16_t usGenerateChecksum( uint32_t ulSum, const uint8_t * pucNextData, BaseType_t xDataLengthBytes );
 
-/* HT Special */
-UBaseType_t uxGetNumberOfFreeNetworkBuffers( void );
-
 /* Socket related private functions. */
-BaseType_t xProcessReceivedUDPPacket( xNetworkBufferDescriptor_t *pxNetworkBuffer, uint16_t usPort );
+BaseType_t xProcessReceivedUDPPacket( NetworkBufferDescriptor_t *pxNetworkBuffer, uint16_t usPort );
 void vNetworkSocketsInit( void );
 
 /* If FreeRTOS+NABTO is included then include the prototype of the function that
@@ -488,7 +492,7 @@ BaseType_t xIPIsNetworkTaskReady( void );
 	 * Note that the values of all short and long integers in these structs
 	 * are being stored in the native-endian way
 	 * Translation should take place when accessing any structure which defines
-	 * network packets, such as xIPHeader_t and xTCPHeader_t
+	 * network packets, such as IPHeader_t and TCPHeader_t
 	 */
 	typedef struct TCPSOCKET
 	{
@@ -546,21 +550,21 @@ BaseType_t xIPIsNetworkTaskReady( void );
 		int32_t lEnoughSpace;
 		int32_t rxStreamSize;
 		int32_t txStreamSize;
-		xStreamBuffer *rxStream;
-		xStreamBuffer *txStream;
+		StreamBuffer_t *rxStream;
+		StreamBuffer_t *txStream;
 		#if( ipconfigUSE_TCP_WIN == 1 )
 			struct xNETWORK_BUFFER *pxAckMessage;
 		#endif /* ipconfigUSE_TCP_WIN */
 		uint8_t fillPacket[ ipconfigPACKET_FILLER_SIZE ];
-		uint8_t lastPacket[ sizeof( xTCPPacket_t ) ];
+		uint8_t lastPacket[ sizeof( TCPPacket_t ) ];
 		uint8_t tcpflags;		/* TCP flags */
 		#if( ipconfigUSE_CALLBACKS == 1 )
 			FOnTcpReceive pHndReceive;	/*
 										 * In case of a TCP socket:
-										 * typedef void (* FOnTcpReceive) (xSocket_t xSocket, void *pData, size_t xLength );
+										 * typedef void (* FOnTcpReceive) (Socket_t xSocket, void *pData, size_t xLength );
 										 */
 			FOnTcpSent pHndSent;
-			FOnConnected pHndConnected;	/* Actually type: typedef void (* FOnConnected) (xSocket_t xSocket, BaseType_t ulConnected ); */
+			FOnConnected pHndConnected;	/* Actually type: typedef void (* FOnConnected) (Socket_t xSocket, BaseType_t ulConnected ); */
 		#endif /* ipconfigUSE_CALLBACKS */
 		uint32_t wnd;			/* Current Window size advertized by peer */
 		uint32_t ulRxCurWinSize;	/* Constantly changing: this is the current size available for data reception */
@@ -584,7 +588,7 @@ typedef struct UDPSOCKET
 	#if( ipconfigUSE_CALLBACKS == 1 )
 		FOnUdpReceive pHndReceive;	/*
 									 * In case of a UDP socket:
-									 * typedef void (* FOnUdpReceive) (xSocket_t xSocket, void *pData, size_t xLength, struct freertos_sockaddr *pxAddr );
+									 * typedef void (* FOnUdpReceive) (Socket_t xSocket, void *pData, size_t xLength, struct freertos_sockaddr *pxAddr );
 									 */
 		FOnUdpSent pHndSent;
 	#endif /* ipconfigUSE_CALLBACKS */
@@ -607,7 +611,7 @@ typedef struct XSOCKET
 
 	ListItem_t xBoundSocketListItem; /* Used to reference the socket from a bound sockets list. */
 	TickType_t xReceiveBlockTime; /* if recv[to] is called while no data is available, wait this amount of time. Unit in clock-ticks */
-	TickType_t xSendBlockTime; /* if send[to] is called while there is not enoug space to send, wait this amount of time. Unit in clock-ticks */
+	TickType_t xSendBlockTime; /* if send[to] is called while there is not enough space to send, wait this amount of time. Unit in clock-ticks */
 
 	uint16_t usLocPort;		/* Local port on this machine */
 	uint8_t ucSocketOptions;
@@ -634,26 +638,26 @@ typedef struct XSOCKET
 			xIPTcpSocket xTcp;
 		#endif /* ipconfigUSE_TCP */
 	} u;
-} xFreeRTOS_Socket_t;
+} FreeRTOS_Socket_t;
 
 #if( ipconfigUSE_TCP == 1 )
 	/*
 	 * Lookup a TCP socket, using a multiple matching: both port numbers and
 	 * return IP address.
 	 */
-	xFreeRTOS_Socket_t *pxTCPSocketLookup( uint32_t ulLocalIP, BaseType_t xLocalPort, uint32_t ulRemoteIP, BaseType_t xRemotePort );
+	FreeRTOS_Socket_t *pxTCPSocketLookup( uint32_t ulLocalIP, BaseType_t xLocalPort, uint32_t ulRemoteIP, BaseType_t xRemotePort );
 
 #endif /* ipconfigUSE_TCP */
 
 /*
  * Look up a local socket by finding a match with the local port.
  */
-xFreeRTOS_Socket_t *pxUDPSocketLookup( BaseType_t xLocalPort );
+FreeRTOS_Socket_t *pxUDPSocketLookup( BaseType_t xLocalPort );
 
 /*
  * Called when the application has generated a UDP packet to send.
  */
-void vProcessGeneratedUDPPacket( xNetworkBufferDescriptor_t * const pxNetworkBuffer );
+void vProcessGeneratedUDPPacket( NetworkBufferDescriptor_t * const pxNetworkBuffer );
 
 /*
  * Calculate the upper-layer checksum
@@ -668,7 +672,7 @@ uint16_t usGenerateProtocolChecksum( const uint8_t * const pucEthernetBuffer, Ba
  * An Ethernet frame has been updated (maybe it was an ARP request or a PING
  * request?) and is to be sent back to its source.
  */
-void vReturnEthernetFrame( xNetworkBufferDescriptor_t * const pxNetworkBuffer, BaseType_t xReleaseAfterSend );
+void vReturnEthernetFrame( NetworkBufferDescriptor_t * pxNetworkBuffer, BaseType_t xReleaseAfterSend );
 
 /*
  * The internal version of bind()
@@ -676,7 +680,7 @@ void vReturnEthernetFrame( xNetworkBufferDescriptor_t * const pxNetworkBuffer, B
  * The TCP driver needs to bind a socket at the moment a listening socket
  * creates a new connected socket
  */
-BaseType_t vSocketBind( xFreeRTOS_Socket_t *pxSocket, struct freertos_sockaddr * pxAddress, BaseType_t xAddressLength, BaseType_t ulInternal );
+BaseType_t vSocketBind( FreeRTOS_Socket_t *pxSocket, struct freertos_sockaddr * pxAddress, BaseType_t xAddressLength, BaseType_t ulInternal );
 
 /*
  * Internal function to add streaming data to a TCP socket. If ulIn == true,
@@ -685,12 +689,12 @@ BaseType_t vSocketBind( xFreeRTOS_Socket_t *pxSocket, struct freertos_sockaddr *
  * packet come in out-of-order, an offset will be used to put it in front and
  * the head will not change yet.
  */
-int32_t lTCPAddRxdata(xFreeRTOS_Socket_t *pxSocket, BaseType_t ulOffset, const uint8_t *pcData, uint32_t ulCount);
+int32_t lTCPAddRxdata(FreeRTOS_Socket_t *pxSocket, BaseType_t ulOffset, const uint8_t *pcData, uint32_t ulCount);
 
 /*
  * Currently called for any important event.
  */
-void vWakeUpSocketUser( xFreeRTOS_Socket_t *pxSocket );
+void vWakeUpSocketUser( FreeRTOS_Socket_t *pxSocket );
 
 /*
  * Some helping function, their meaning should be clear
@@ -711,14 +715,14 @@ static portINLINE uint16_t usChar2u16 (const uint8_t *apChr)
 }
 
 /* Check a single socket for retransmissions and timeouts */
-BaseType_t xTCPSocketCheck( xFreeRTOS_Socket_t *pxSocket );
+BaseType_t xTCPSocketCheck( FreeRTOS_Socket_t *pxSocket );
 
-BaseType_t xTCPCheckNewClient( xFreeRTOS_Socket_t *pxSocket );
+BaseType_t xTCPCheckNewClient( FreeRTOS_Socket_t *pxSocket );
 
 /* Defined in FreeRTOS_Sockets.c
  * Close a socket
  */
-void *vSocketClose( xFreeRTOS_Socket_t *pxSocket );
+void *vSocketClose( FreeRTOS_Socket_t *pxSocket );
 
 /*
  * Send the event eEvent to the IP task event queue, using a block time of
@@ -727,25 +731,34 @@ void *vSocketClose( xFreeRTOS_Socket_t *pxSocket );
 */
 BaseType_t xSendEventToIPTask( eIPEvent_t eEvent );
 
-/* 
+/*
  * The same as above, but a struct as a parameter, containing:
  * 		eIPEvent_t eEventType;
  *		void *pvData;
  */
-BaseType_t xSendEventStructToIPTask( const xIPStackEvent_t *pxEvent, TickType_t xTimeout );
+BaseType_t xSendEventStructToIPTask( const IPStackEvent_t *pxEvent, TickType_t xTimeout );
 
-/* 
+/*
  * Returns a pointer to the original NetworkBuffer from a pointer to a UDP
  * payload buffer.
  */
-xNetworkBufferDescriptor_t *pxUDPPayloadBuffer_to_NetworkBuffer( void *pvBuffer );
+NetworkBufferDescriptor_t *pxUDPPayloadBuffer_to_NetworkBuffer( void *pvBuffer );
 
-/* 
+#if( ipconfigZERO_COPY_TX_DRIVER != 0 )
+	/*
+	 * For the case where the network driver passes a buffer directly to a DMA
+	 * descriptor, this function can be used to translate a 'network buffer' to
+	 * a 'network buffer descriptor'.
+	 */
+	NetworkBufferDescriptor_t *pxPacketBuffer_to_NetworkBuffer( void *pvBuffer );
+#endif
+
+/*
  * Internal: Sets a new state for a TCP socket
  * and performs the necessary actions like calling a OnConnected handler
  * to notify the socket owner
  */
-void vTCPStateChange( xFreeRTOS_Socket_t *pxSocket, BaseType_t xTcpState );
+void vTCPStateChange( FreeRTOS_Socket_t *pxSocket, BaseType_t xTcpState );
 
 static portINLINE UBaseType_t uxGetRxEventCount( void )
 {
@@ -757,7 +770,7 @@ static portINLINE UBaseType_t uxGetRxEventCount( void )
 void FreeRTOS_netstat( void );
 
 /* Returns pdTRUE is this function is called from the IP-task */
-BaseType_t xIsCallingFromISRTask( void );
+BaseType_t xIsCallingFromIPTask( void );
 
 #if( ipconfigSUPPORT_SELECT_FUNCTION == 1 )
 
@@ -765,10 +778,10 @@ typedef struct xSOCKET_SET
 {
 	EventGroupHandle_t xSelectGroup;
 	BaseType_t bApiCalled;	/* True if the API was calling  the private vSocketSelect */
-	xFreeRTOS_Socket_t *pxSocket;
-} xSocketSelect_t;
+	FreeRTOS_Socket_t *pxSocket;
+} SocketSelect_t;
 
-extern void vSocketSelect( xSocketSelect_t *pxSocketSelect );
+extern void vSocketSelect( SocketSelect_t *pxSocketSelect );
 
 #endif /* ipconfigSUPPORT_SELECT_FUNCTION */
 

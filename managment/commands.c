@@ -17,7 +17,7 @@
 #include "udpd.h"
 
 
-extern char arg[MAX_LEX_COUNT][MAX_LEX_LEN];
+extern char arg[DB_COUNT][DB_CMD_MAX_LEN];
 extern ETH_HandleTypeDef heth_global;
 
 void show_cmd(void *tsm)

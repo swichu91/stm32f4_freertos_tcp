@@ -50,7 +50,9 @@
 uint64_t u64IdleTicksCnt=0; // Counts when the OS has no task to execute.
 uint64_t tickTime=0;        // Counts OS ticks (default = 1000Hz).
 
-const char* welcome_logo =	"\r\nWelcome!\r\nSoftware Version : 1.00 alpha\r\nCreated by: Mateusz Piesta\r\n\r\n\r\n";
+const char* welcome_logo =	"\r\nWelcome!\r\n" \
+		"Software Version : 1.00 alpha\r\n" \
+		"Created by: Mateusz Piesta\r\n\r\n\r\n"; \
 
 
 
@@ -129,10 +131,10 @@ extern void prvEMACDeferredInterruptHandlerTask( void *pvParameters );
 
 void Main_task (void * pvparameters)
 {
-
+	//print welcome msg with actual software version
+	print_console(welcome_logo);
+	//console_mngt_init();
 	xTaskCreate(vBlinkLed, "Blink Led",configMINIMAL_STACK_SIZE,NULL,0,NULL);
-	xTaskCreate(vConsoleRxTask,"ConRxTask",1024,NULL,1,NULL);
-	xTaskCreate(vConsoleTxTask,"ConTxTask",100,NULL,0,NULL);
     xTaskCreate(prvEMACDeferredInterruptHandlerTask,"EthRcvTask",2048,NULL,configMAX_PRIORITIES-3,NULL);
 
 
@@ -181,13 +183,13 @@ main(int argc, char* argv[])
 	gdb_init();
 
 	init_system_led();
+
 	usart_init(3000000); // usart na 3MHz to jest maks co ft232 moze wyciagnac
 
-	print_console(welcome_logo);
 
-	can_init(1024);
+	//can_init(1024);
 
-	xTaskCreate(Main_task,"Main", 8096, NULL,0, NULL);
+	xTaskCreate(Main_task,"Main", 8096, NULL,7, NULL);
 
 	vTaskStartScheduler(); // This should never return.
 

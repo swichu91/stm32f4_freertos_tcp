@@ -14,10 +14,10 @@
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_IP_Private.h"
 
+void gdb_init(void);
 
 
-
-void gdb_init()
+void gdb_init(void)
 {
 
 	//UDP

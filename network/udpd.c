@@ -179,7 +179,7 @@ void prvServerConnectionInstance( void *pvParameters )
 {
 
 	xSocket_t xSocket;
-	static char cRxedData[ BUFFER_SIZE ];
+	char cRxedData[ BUFFER_SIZE ];
 	BaseType_t lBytesReceived;
 
 	    /* It is assumed the socket has already been created and connected before
@@ -189,14 +189,18 @@ void prvServerConnectionInstance( void *pvParameters )
 	    for( ;; )
 	    {
 	        /* Receive another block of data into the cRxedData buffer. */
-	        lBytesReceived = FreeRTOS_recv( xSocket, &cRxedData, BUFFER_SIZE, 0 );
+	        lBytesReceived = FreeRTOS_recv( xSocket, cRxedData, BUFFER_SIZE, 0 );
 
 	        if( lBytesReceived > 0 )
 	        {
 	            /* Data was received, process it here. */
+	            FreeRTOS_send(xSocket,cRxedData,lBytesReceived,0);
+
 	            char buffer[50];
-	            sprintf(buffer,"Bytes received:%x\r\n",lBytesReceived);
-	            print_console(buffer);
+	        	            sprintf(buffer,"Bytes received:%d\r\n",lBytesReceived);
+	        	            //print_console(buffer);
+
+
 	        }
 	        else if( lBytesReceived == 0 )
 	        {
@@ -207,6 +211,7 @@ void prvServerConnectionInstance( void *pvParameters )
 	        {
 	            /* Error (maybe the connected socket already shut down the socket?).
 	            Attempt graceful shutdown. */
+	        	print_console("Remote close\r\n");
 	            FreeRTOS_shutdown( xSocket, FREERTOS_SHUT_RDWR );
 	            break;
 	        }
@@ -238,6 +243,19 @@ socklen_t xSize = sizeof( xClient );
 static const TickType_t xReceiveTimeOut = portMAX_DELAY;
 const BaseType_t xBacklog = 20;
 
+
+#if( ipconfigUSE_TCP_WIN == 1 )
+	WinProperties_t xWinProps;
+
+	/* Fill in the buffer and window sizes that will be used by the socket. */
+	xWinProps.lTxBufSize = ipconfigTCP_TX_BUF_LEN;
+	xWinProps.lTxWinSize = 1;
+	xWinProps.lRxBufSize = ipconfigTCP_RX_BUF_LEN;
+	xWinProps.lRxWinSize = 1;
+#endif /* ipconfigUSE_TCP_WIN */
+
+
+
     /* Attempt to open the socket. */
     xListeningSocket = FreeRTOS_socket( FREERTOS_AF_INET,
 			 	 	 	 	 	 	 	 FREERTOS_SOCK_STREAM,
@@ -262,8 +280,15 @@ const BaseType_t xBacklog = 20;
                          &xReceiveTimeOut,
                          sizeof( xReceiveTimeOut ) );
 
-    /* Set the listening port to 10000. */
-    xBindAddress.sin_port = ( uint16_t ) 10000;
+    /* Set the window and buffer sizes. */
+    	#if( ipconfigUSE_TCP_WIN == 1 )
+    	{
+    		FreeRTOS_setsockopt( xListeningSocket, 0, FREERTOS_SO_WIN_PROPERTIES, ( void * ) &xWinProps, sizeof( xWinProps ) );
+    	}
+    	#endif /* ipconfigUSE_TCP_WIN */
+
+    /* Set the listening port to 20000. */
+    xBindAddress.sin_port = ( uint16_t ) 20000;
     xBindAddress.sin_port = FreeRTOS_htons( xBindAddress.sin_port );
 
     /* Bind the socket to the port that the client RTOS task will send to. */
@@ -277,18 +302,19 @@ const BaseType_t xBacklog = 20;
     {
         /* Wait for incoming connections. */
         xConnectedSocket = FreeRTOS_accept( xListeningSocket, &xClient, &xSize );
-        //configASSERT( xConnectedSocket != FREERTOS_INVALID_SOCKET );
-        if(xConnectedSocket == FREERTOS_INVALID_SOCKET) print_console("Invalid socket\r\n");
-        else
+        configASSERT( xConnectedSocket != FREERTOS_INVALID_SOCKET );
+        if( xConnectedSocket && xConnectedSocket != FREERTOS_INVALID_SOCKET)
         {
+        	//print_console("connected\r\n");
 
         /* Spawn a RTOS task to handle the connection. */
                 xTaskCreate( prvServerConnectionInstance,
                              "EchoServer",
-                             1024,
+                             2048,
                              ( void * ) xConnectedSocket,
-                             tskIDLE_PRIORITY,
+                             0,
                              NULL );
+
 
         }
 

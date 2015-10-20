@@ -113,7 +113,8 @@ on).  Valid options are FREERTOS_BIG_ENDIAN and FREERTOS_LITTLE_ENDIAN. */
 /* If the network card/driver includes checksum offloading (IP/TCP/UDP checksums)
 then set ipconfigDRIVER_INCLUDED_RX_IP_CHECKSUM to 1 to prevent the software
 stack repeating the checksum calculations. */
-#define ipconfigDRIVER_INCLUDED_RX_IP_CHECKSUM   1 // TODO hardware checksum
+#define ipconfigDRIVER_INCLUDED_RX_IP_CHECKSUM   1
+#define ipconfigDRIVER_INCLUDED_TX_IP_CHECKSUM   1
 
 /* Several API's will block until the result is known, or the action has been
 performed, for example FreeRTOS_send() and FreeRTOS_recv().  The timeouts can be
@@ -274,16 +275,16 @@ aborted. */
 #define ipconfigUSE_TCP				( 1 )
 
 /* USE_WIN: Let TCP use windowing mechanism. */
-#define ipconfigUSE_TCP_WIN			( 1 )
+#define ipconfigUSE_TCP_WIN			( 0 )
 
 /* The MTU is the maximum number of bytes the payload of a network frame can
 contain.  For normal Ethernet V2 frames the maximum MTU is 1500.  Setting a
 lower value can save RAM, depending on the buffer management scheme used.  If
 ipconfigCAN_FRAGMENT_OUTGOING_PACKETS is 1 then (ipconfigNETWORK_MTU - 28) must
 be divisible by 8. */
-#define ipconfigNETWORK_MTU		1524 // 4 byte aligned
+#define ipconfigNETWORK_MTU		556 // 4 byte aligned
 
-#define ipconfigTCP_MSS			1460
+#define ipconfigTCP_MSS			512
 
 /* Set ipconfigUSE_DNS to 1 to include a basic DNS client/resolver.  DNS is used
 through the FreeRTOS_gethostbyname() API function. */
@@ -315,10 +316,6 @@ because the packet will already have been passed into the stack).  If the
 Ethernet driver does all the necessary filtering in hardware then software
 filtering can be removed by using a value other than 1 or 0. */
 #define ipconfigETHERNET_DRIVER_FILTERS_FRAME_TYPES	1
-
-/* The windows simulator cannot really simulate MAC interrupts, and needs to
-block occasionally to allow other tasks to run. */
-#define configWINDOWS_MAC_INTERRUPT_SIMULATOR_DELAY ( 2 / portTICK_PERIOD_MS )
 
 /* Advanced only: in order to access 32-bit fields in the IP packets with
 32-bit memory instructions, all packets will be stored 32-bit-aligned, plus 16-bits.

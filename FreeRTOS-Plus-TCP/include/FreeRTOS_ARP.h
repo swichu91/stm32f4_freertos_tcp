@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+TCP Labs Build 141019 (C) 2014 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -44,7 +44,8 @@
  * 1 tab == 4 spaces!
  *
  * http://www.FreeRTOS.org
- * http://www.FreeRTOS.org/udp
+ * http://www.FreeRTOS.org/plus
+ * http://www.FreeRTOS.org/labs
  *
  */
 
@@ -67,10 +68,10 @@ extern "C" {
 typedef struct xARP_CACHE_TABLE_ROW
 {
 	uint32_t ulIPAddress;		/* The IP address of an ARP cache entry. */
-	xMACAddress_t xMACAddress;  /* The MAC address of an ARP cache entry. */
+	MACAddress_t xMACAddress;  /* The MAC address of an ARP cache entry. */
 	uint8_t ucAge;				/* A value that is periodically decremented but can also be refreshed by active communication.  The ARP cache entry is removed if the value reaches zero. */
     uint8_t ucValid;			/* pdTRUE: xMACAddress is valid, pdFALSE: waiting for ARP reply */
-} xARPCacheRow_t;
+} ARPCacheRow_t;
 
 typedef enum
 {
@@ -92,7 +93,14 @@ typedef enum
  * cache table then add it - replacing the oldest current entry if there is not
  * a free space available.
  */
-void vARPRefreshCacheEntry( const xMACAddress_t * pxMACAddress, const uint32_t ulIPAddress );
+void vARPRefreshCacheEntry( const MACAddress_t * pxMACAddress, const uint32_t ulIPAddress );
+
+#if( ipconfigARP_USE_CLASH_DETECTION != 0 )
+	/* Becomes non-zero if another device responded to a gratuitos ARP message. */
+	extern BaseType_t xARPHadIPClash;
+	/* MAC-address of the other device containing the same IP-address. */
+	extern MACAddress_t xARPClashMacAddress;
+#endif /* ipconfigARP_USE_CLASH_DETECTION */
 
 #if( ipconfigUSE_ARP_REMOVE_ENTRY != 0 )
 
@@ -100,7 +108,7 @@ void vARPRefreshCacheEntry( const xMACAddress_t * pxMACAddress, const uint32_t u
 	 * In some rare cases, it might be useful to remove a ARP cache entry of a
 	 * known MAC address to make sure it gets refreshed
 	 */
-	uint32_t ulARPRemoveCacheEntryByMac( const xMACAddress_t * pxMACAddress );
+	uint32_t ulARPRemoveCacheEntryByMac( const MACAddress_t * pxMACAddress );
 
 #endif /* ipconfigUSE_ARP_REMOVE_ENTRY != 0 */
 
@@ -112,12 +120,12 @@ void vARPRefreshCacheEntry( const xMACAddress_t * pxMACAddress, const uint32_t u
  * (maybe DHCP is still in process, or the addressing needs a gateway but there
  * isn't a gateway defined) then return eCantSendPacket.
  */
-eARPLookupResult_t eARPGetCacheEntry( uint32_t *pulIPAddress, xMACAddress_t * const pxMACAddress );
+eARPLookupResult_t eARPGetCacheEntry( uint32_t *pulIPAddress, MACAddress_t * const pxMACAddress );
 
 #if( ipconfigUSE_ARP_REVERSED_LOOKUP != 0 )
 
 	/* Lookup an IP-address if only the MAC-address is known */
-	eARPLookupResult_t eARPGetCacheEntryByMac( xMACAddress_t * const pxMACAddress, uint32_t *pulIPAddress );
+	eARPLookupResult_t eARPGetCacheEntryByMac( MACAddress_t * const pxMACAddress, uint32_t *pulIPAddress );
 
 #endif
 /*
@@ -131,7 +139,7 @@ void vARPAgeCache( void );
  * add an entry into the ARP table that indicates that an ARP reply is
  * outstanding so re-transmissions can be generated.
  */
-void vARPGenerateRequestPacket( xNetworkBufferDescriptor_t * const pxNetworkBuffer );
+void vARPGenerateRequestPacket( NetworkBufferDescriptor_t * const pxNetworkBuffer );
 
 /*
  * After DHCP is ready and when changing IP address, force a quick send of our new IP

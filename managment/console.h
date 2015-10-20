@@ -3,27 +3,19 @@
 
 
 #include <stdint.h>
+#include <stdbool.h>
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
 
 
-#define CMD_MAX_LEN 	50
+#define RX_QUEUE_LENGTH	512
+#define TX_QUEUE_LENGTH	512
 
-#define EOT (0x04)
-#define BS	(0x7f)
-#define LF	(0x0a)
-#define CR_CM	(0x0d)
-#define ETB	 (0x17)
-#define ESC	(0x1b)
-#define CMD_PRMT	(0x3E)
+#define DB_CMD_MAX_LEN 50
+#define DB_COUNT	10
 
-#define RX_QUEUE_LENGTH	1000
-#define MAX_LEX_LEN		20 // 16 + 1 na na znak '\0' np. adres ip: 100.100.100.100=15znakow (zmiana na 32)
-#define MAX_LEX_COUNT	10
-
-struct history
-{
-    char* cmd;
-    unsigned char  no;
-};
 
 typedef struct __action_command
 {
@@ -32,14 +24,47 @@ typedef struct __action_command
 	uint32_t idx_in_help_file;
 }_action_command;
 
+typedef struct _history_db
+{
+	uint32_t	RD_p;
+	uint32_t	WR_p;
+	uint32_t 	size;
+	uint32_t 	count;
+
+	char    *data_ptr[DB_COUNT];
+	bool	is_full;
+	bool	is_empty;
+
+}history_db_t;
+
+typedef struct _console_mngt
+{
+	xQueueHandle uart_tx_queue;
+	xQueueHandle uart_rx_queue;
+	xSemaphoreHandle uart_tx_rdy_smph;
+
+	uint32_t b_rx_cnt;
+	uint32_t b_tx_cnt;
+
+	history_db_t history_db;
+
+	int8_t	current_cmd_len;
+	char	cmd_buf[DB_CMD_MAX_LEN];
+
+
+}console_mngt_t;
+
+//bufory dla leksemow polecenia konsoli
+char arg[DB_COUNT][DB_CMD_MAX_LEN];
+
 
 static const char cmd_not_found[]="\r\nCommand not found\r\n";
 
-void vConsoleRxTask (void *pvparameters);
-void vConsoleTxTask (void *pvparameters);
-void print_console (char const * string);
-void interpreter(char *cmd_buf, char len, void *tsm,char *cmd);
+void print_console (const char * string);
+void console_mngt_init(void);
+
 void usart_init(uint32_t baudrate);
+void usart_set_interrupts(void);
 
 
 #endif
