@@ -29,7 +29,8 @@ typedef struct __sys
 
 typedef struct __monit
 {
-
+	uint64_t rx_eth_frames;
+	uint64_t tx_eth_frames;
 
 
 

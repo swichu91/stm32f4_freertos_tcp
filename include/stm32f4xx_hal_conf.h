@@ -174,10 +174,21 @@
 #define MAC_ADDR5   0x55
 
 /* Definition of the Ethernet driver buffers size and count */   
-#define ETH_RX_BUF_SIZE                196//ETH_MAX_PACKET_SIZE /* buffer size for receive               */
-#define ETH_TX_BUF_SIZE                196//ETH_MAX_PACKET_SIZE /* buffer size for transmit              */
-#define ETH_RXBUFNB                    ((uint32_t)4)       /* 4 Rx buffers of size ETH_RX_BUF_SIZE  */
-#define ETH_TXBUFNB                    ((uint32_t)4)       /* 4 Tx buffers of size ETH_TX_BUF_SIZE  */
+//#define ETH_RX_BUF_SIZE                1536
+//#define ETH_TX_BUF_SIZE                1536						//ETH_MAX_PACKET_SIZE /* buffer size for transmit              */
+//#define ETH_RXBUFNB                    ((uint32_t)6)       /* 4 Rx buffers of size ETH_RX_BUF_SIZE  */
+//#define ETH_TXBUFNB                    ((uint32_t)4)       /* 4 Tx buffers of size ETH_TX_BUF_SIZE  */
+
+
+//TODO: aktualnei na tym pracuje zestawie buforow, bedziemy jeszcze testowac pod katem wydajnosci ale wydaje mi sie ze lepiej wiecej malych niz mniej duzych
+// z racji faktu ze w ethernecie wiekszosc ramek ma maly rozmiar, na pewno rzadziej wysylane sa ramki o MTU
+#define ETH_RX_BUF_SIZE                512
+#define ETH_TX_BUF_SIZE                196						//ETH_MAX_PACKET_SIZE /* buffer size for transmit              */
+#define ETH_RXBUFNB                    ((uint32_t)12)       /* 4 Rx buffers of size ETH_RX_BUF_SIZE  */
+#define ETH_TXBUFNB                    ((uint32_t)16)       /* 4 Tx buffers of size ETH_TX_BUF_SIZE  */
+
+
+
 
 /* Section 2: PHY configuration section */
 

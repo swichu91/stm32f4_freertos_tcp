@@ -64,6 +64,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include "stm32f407xx.h"
+#include "stm32f4xx_hal.h"
 
 /*
  * Moje define do konfiguracji mac/phy
@@ -282,9 +283,16 @@ contain.  For normal Ethernet V2 frames the maximum MTU is 1500.  Setting a
 lower value can save RAM, depending on the buffer management scheme used.  If
 ipconfigCAN_FRAGMENT_OUTGOING_PACKETS is 1 then (ipconfigNETWORK_MTU - 28) must
 be divisible by 8. */
-#define ipconfigNETWORK_MTU		556 // 4 byte aligned
 
-#define ipconfigTCP_MSS			512
+#define ipconfigCAN_FRAGMENT_OUTGOING_PACKETS 0
+
+/*
+ * MTU obliczam na podstawie MTU= 14(ETHERNET header) + 20(IP Header) + 20 (TCP Header) + MSS
+ * Zaobserwowalem,ze najlepiej dziala stos gdy ustawimy rozmiar bufora RX/Tx dla MAC tak aby zmiescila sie w nim cala ramka TCP/IP
+ *
+ */
+#define ipconfigNETWORK_MTU		1500//ETH_RX_BUF_SIZE // 4 byte aligned
+#define ipconfigTCP_MSS			1460//(ETH_RX_BUF_SIZE - 54) // dlaczego tak ? patrz na powyzszy komentarz
 
 /* Set ipconfigUSE_DNS to 1 to include a basic DNS client/resolver.  DNS is used
 through the FreeRTOS_gethostbyname() API function. */
@@ -332,10 +340,10 @@ simultaneously, one could define TCP_WIN_SEG_COUNT as 120. */
 
 /* Each TCP socket has a circular buffers for Rx and Tx, which have a fixed
 maximum size.  Define the size of Rx buffer for TCP sockets. */
-#define ipconfigTCP_RX_BUF_LEN			( 16 * ipconfigTCP_MSS ) // todo: tutaj ostroznie, nie wiem czy z ramem sie wyrobie
+#define ipconfigTCP_RX_BUF_LEN			( 4 * ipconfigTCP_MSS ) // todo: tutaj ostroznie, nie wiem czy z ramem sie wyrobie
 
 /* Define the size of Tx buffer for TCP sockets. */
-#define ipconfigTCP_TX_BUF_LEN			( 16 * ipconfigTCP_MSS )
+#define ipconfigTCP_TX_BUF_LEN			( 4 * ipconfigTCP_MSS )
 
 
 
