@@ -138,9 +138,9 @@ inline static void print_prompt(console_mngt_t* ptr){
 void console_mngt_init(void)
 {
 	history_db_init(&mngt_s.history_db);
-
-	xTaskCreate(console_mngt_RxTask,"ConRxTask",512,&mngt_s,1,NULL);
-	xTaskCreate(console_mngt_TxTask,"ConTxTask",100,&mngt_s,0,NULL);
+												//przy masakrowaniu pakietami danych przez Putty watermark zostaje na 14 wiec tyle jest optymalnie
+	xTaskCreate(console_mngt_RxTask,"ConRxTask",configMINIMAL_STACK_SIZE*3,&mngt_s,1,NULL);
+	xTaskCreate(console_mngt_TxTask,"ConTxTask",configMINIMAL_STACK_SIZE,&mngt_s,0,NULL);
 
 }
 

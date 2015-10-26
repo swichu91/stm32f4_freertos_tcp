@@ -224,7 +224,6 @@ void tasks_list_cmd(void *tsm)
 	char buffer[500];
 
 	vTaskList(buffer);
-	//print_console("Name        State        ")
 	print_console(buffer);
 
 

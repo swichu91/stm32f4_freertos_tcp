@@ -133,9 +133,9 @@ void Main_task (void * pvparameters)
 {
 	//print welcome msg with actual software version
 	print_console(welcome_logo);
-	//console_mngt_init();
+	console_mngt_init();
 	xTaskCreate(vBlinkLed, "Blink Led",configMINIMAL_STACK_SIZE,NULL,0,NULL);
-    xTaskCreate(prvEMACDeferredInterruptHandlerTask,"EthRcvTask",2048,NULL,configMAX_PRIORITIES-3,NULL);
+    xTaskCreate(prvEMACDeferredInterruptHandlerTask,"EthRcvTask",configMINIMAL_STACK_SIZE,NULL,configMAX_PRIORITIES-3,NULL);
 
 
 	/* The MAC address array is not declared const as the MAC address will

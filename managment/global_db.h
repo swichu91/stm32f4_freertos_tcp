@@ -14,69 +14,55 @@
 #include "semphr.h"
 #include "FreeRTOS_Sockets.h"
 
-
-
 void gdb_init(void);
 
-typedef struct __sys
+struct _sys
 {
 	uint32_t ipaddress;
 	uint32_t maskaddress;
 	uint32_t gwaddress;
 	uint32_t dnsaddress;
 
-}_sys;
+};
 
-typedef struct __monit
+struct _monit
 {
 	uint64_t rx_eth_frames;
 	uint64_t tx_eth_frames;
 
+};
 
 
-
-
-
-}_monit;
-
-
-typedef struct __udp_task_param
+struct _udp_task_param
 {
 
 	uint32_t udpcan_remote_ip;
 	uint16_t udpcan_remote_port;
 
 
-}_udp_task_param;
+};
 
-typedef struct __udp
+struct _udp
 {
 
 	struct freertos_sockaddr xDestinationAddress;
 
-}_udp;
+};
 
 
-typedef struct __gdb
+struct _gdb
 {
 
-	_sys sys; // info o konfiguracji urzadzenia
-	_monit monit; // monitorujaca
-	_udp udp;	// roznorakie do udp
+	struct _sys sys; // info o konfiguracji urzadzenia
+	struct _monit monit; // monitorujaca
+	struct _udp udp;	// roznorakie do udp
 
 
-}_gdb;
+};
 
 
 //inicjalizacja globalnej struktury z danymi
-_gdb gdb;
-
-
-
-
-
-
-
+struct _gdb gdb;
 
 
 

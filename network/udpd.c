@@ -24,6 +24,7 @@
 #include "global_db.h"
 
 
+
 extern QueueHandle_t CANFramesQueue;
 
 
@@ -181,10 +182,19 @@ void prvServerConnectionInstance( void *pvParameters )
 	xSocket_t xSocket;
 	char cRxedData[ BUFFER_SIZE ];
 	BaseType_t lBytesReceived;
+	static const TickType_t keep_alive_time = 15000;
 
 	    /* It is assumed the socket has already been created and connected before
 	    being passed into this RTOS task using the RTOS task's parameter. */
 	    xSocket = ( xSocket_t ) pvParameters;
+
+
+	    /* Set a time out so accept() will just wait for a connection. */
+	    FreeRTOS_setsockopt( xSocket,
+	                         0,
+	                         FREERTOS_SO_RCVTIMEO,
+	                         &keep_alive_time,
+	                         sizeof( keep_alive_time ) );
 
 	    for( ;; )
 	    {
@@ -194,11 +204,22 @@ void prvServerConnectionInstance( void *pvParameters )
 	        if( lBytesReceived > 0 )
 	        {
 	            /* Data was received, process it here. */
-	            FreeRTOS_send(xSocket,cRxedData,lBytesReceived,0);
+	           // FreeRTOS_send(xSocket,cRxedData,lBytesReceived,0);
 
-	            char buffer[50];
-	        	            sprintf(buffer,"Bytes received:%d\r\n",lBytesReceived);
-	        	            //print_console(buffer);
+	           FreeRTOS_send(xSocket,"HTTP/1.1 200 OK\n", 16,0);
+	           FreeRTOS_send(xSocket,"Content-length: 59\n", 19,0);
+	           FreeRTOS_send(xSocket,"Content-Type: text/html\n", 24,0);
+	           FreeRTOS_send(xSocket,"Keep-Alive: timeout=15, max=100\n", 32,0);
+	           FreeRTOS_send(xSocket,"Connection: keep-alive\n\n", 25,0);
+	           FreeRTOS_send(xSocket,"<html><body><H1>Pozdrowienia dla misiora!</H1></body></html>",59,0);
+
+	            cRxedData[lBytesReceived] = '\0';
+
+	            print_console(cRxedData);
+
+	            //char buffer[50];
+	        	        //    sprintf(buffer,"Bytes received:%d\r\n",lBytesReceived);
+	        	        //    print_console(buffer);
 
 
 	        }
@@ -206,6 +227,10 @@ void prvServerConnectionInstance( void *pvParameters )
 	        {
 	            /* No data was received, but FreeRTOS_recv() did not return an error.
 	            Timeout? */
+	        	// chwilowo timeout i remote close potraktujemy tka samo
+	        	print_console("Remote close\r\n");
+	            FreeRTOS_shutdown( xSocket, FREERTOS_SHUT_RDWR );
+	            break;
 	        }
 	        else
 	        {
@@ -288,7 +313,7 @@ const BaseType_t xBacklog = 20;
     	#endif /* ipconfigUSE_TCP_WIN */
 
     /* Set the listening port to 20000. */
-    xBindAddress.sin_port = ( uint16_t ) 20000;
+    xBindAddress.sin_port = ( uint16_t ) 80;
     xBindAddress.sin_port = FreeRTOS_htons( xBindAddress.sin_port );
 
     /* Bind the socket to the port that the client RTOS task will send to. */

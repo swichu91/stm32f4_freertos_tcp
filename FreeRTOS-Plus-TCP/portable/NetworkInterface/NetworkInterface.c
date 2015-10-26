@@ -302,11 +302,9 @@ BaseType_t xNetworkInterfaceOutput( xNetworkBufferDescriptor_t * const pxDescrip
 	  uint8_t *buffer = (uint8_t *)(heth_global.TxDesc->Buffer1Addr);
 	  __IO ETH_DMADescTypeDef *DmaTxDesc;
 	  uint32_t framelength = 0;
-	  uint32_t bufferoffset = 0;
 	  uint32_t byteslefttocopy = 0;
 	  uint32_t payloadoffset = 0;
 	  DmaTxDesc = heth_global.TxDesc;
-	  bufferoffset = 0;
 
 	  uint8_t errval;
 
@@ -355,6 +353,8 @@ BaseType_t xNetworkInterfaceOutput( xNetworkBufferDescriptor_t * const pxDescrip
 
 	  /* Prepare transmit descriptors to give to DMA */
 	  HAL_ETH_TransmitFrame(&heth_global, framelength);
+
+	  gdb.monit.tx_eth_frames++;
 
 	  /* Call the standard trace macro to log the send event. */
 	   iptraceNETWORK_INTERFACE_TRANSMIT();
@@ -498,6 +498,7 @@ uint32_t i=0;
                         /* The message was successfully sent to the TCP/IP stack.
                         Call the standard trace macro to log the occurrence. */
                         iptraceNETWORK_INTERFACE_RECEIVE();
+                        gdb.monit.rx_eth_frames++;
                     }
                 }
                 else
