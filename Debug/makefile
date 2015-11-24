@@ -14,13 +14,18 @@ RM := rm -rf
 -include system/src/cortexm/subdir.mk
 -include system/src/cmsis/subdir.mk
 -include src/subdir.mk
+-include network/sntp/subdir.mk
 -include network/subdir.mk
 -include managment/subdir.mk
+-include USB_Host/USB-Host-Library/subdir.mk
+-include USB_Host/subdir.mk
 -include FreeRTOS/portable/MemMang/subdir.mk
 -include FreeRTOS/portable/ARM_CM4F/subdir.mk
 -include FreeRTOS-Plus-TCP/portable/NetworkInterface/subdir.mk
 -include FreeRTOS-Plus-TCP/portable/BufferManagement/subdir.mk
 -include FreeRTOS-Plus-TCP/subdir.mk
+-include FreeRTOS-Plus-FAT/portable/common/subdir.mk
+-include FreeRTOS-Plus-FAT/subdir.mk
 -include FreeRTOS/subdir.mk
 -include subdir.mk
 -include objects.mk
@@ -69,7 +74,7 @@ all: ethernet_stm32f4.elf secondary-outputs
 ethernet_stm32f4.elf: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cross ARM C++ Linker'
-	arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -Og -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -ffreestanding -pedantic -Wunused -Wuninitialized -Wall -Wpointer-arith -Wshadow -Wlogical-op -Waggregate-return -Wfloat-equal  -g3 -T mem.ld -T libs.ld -T sections.ld -nostartfiles -Xlinker --gc-sections -L"../ldscripts" -Wl,-Map,"ethernet_stm32f4.map" --specs=nano.specs -o "ethernet_stm32f4.elf" $(OBJS) $(USER_OBJS) $(LIBS)
+	arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -O1 -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -ffreestanding -Wunused -Wuninitialized -Wall -Wpointer-arith -Wshadow -Wlogical-op -Waggregate-return -Wfloat-equal  -g3 -T mem.ld -T libs.ld -T sections.ld -nostartfiles -Xlinker --gc-sections -L"../ldscripts" -Wl,-Map,"ethernet_stm32f4.map" --specs=nano.specs -o "ethernet_stm32f4.elf" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

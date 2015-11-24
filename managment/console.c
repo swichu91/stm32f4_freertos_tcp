@@ -21,9 +21,10 @@
 #include <strings.h>
 #include <stdlib.h>
 #include "stm32f4xx_hal.h"
+#include "cmsis_os.h"
 
 
-#define TX_BLOCKING_TIME	20
+#define TX_BLOCKING_TIME	200
 
 
 /*
@@ -83,6 +84,13 @@ static inline void CLR_RXE_INTERRUPT(void){
 	(USART6->CR1 &= ~USART_CR1_RXNEIE);
 }
 
+/* Determine whether we are in thread mode or handler mode. */
+static int inHandlerMode (void)
+{
+  return __get_IPSR() != 0;
+}
+
+
 /*
  * Tablica zawierajaca komendy obslugiwane przez interpreter
  *
@@ -98,7 +106,11 @@ const _action_command comm_act[] =
 		 {"cmdlist",		 commlist_cmd},
 		 {"show",			 show_cmd},
 		 {"udp",			 udp_cmd},
-		 {"tasklist",		 tasks_list_cmd}
+		 {"tasklist",		 tasks_list_cmd},
+		 {"netstat",		 netstat_cmd},
+		 {"arp",		 	 arp_cmd},
+		 {"dir",		 	 DIR_cmd},
+		 {"cwd",		 	 CWD_cmd}
 
 
 
@@ -139,8 +151,8 @@ void console_mngt_init(void)
 {
 	history_db_init(&mngt_s.history_db);
 												//przy masakrowaniu pakietami danych przez Putty watermark zostaje na 14 wiec tyle jest optymalnie
-	xTaskCreate(console_mngt_RxTask,"ConRxTask",configMINIMAL_STACK_SIZE*3,&mngt_s,1,NULL);
-	xTaskCreate(console_mngt_TxTask,"ConTxTask",configMINIMAL_STACK_SIZE,&mngt_s,0,NULL);
+	xTaskCreate(console_mngt_RxTask,"ConRxTask",configMINIMAL_STACK_SIZE*3,&mngt_s,0,NULL);
+	xTaskCreate(console_mngt_TxTask,"ConTxTask",configMINIMAL_STACK_SIZE,&mngt_s,1,NULL);
 
 }
 
@@ -172,17 +184,25 @@ static void console_mngt_TxTask (void *pvparameters)
 
 void print_console(const char* string)
 {
-		/*if(console_mngt_tx_queue)
-		{
-			// wpis do kolejki
-			for(; *string!= 0; string++){
+	portBASE_TYPE taskWoken = pdFALSE;
+
+	if(console_mngt_tx_queue)
+	{
+		// wpis do kolejki
+		for(; *string!= 0; string++){
+
+			if(inHandlerMode())
+				xQueueSendFromISR(console_mngt_tx_queue, ( void * ) string, &taskWoken);
+			else
 				xQueueSend( console_mngt_tx_queue, ( void * ) string, TX_BLOCKING_TIME ); // silently ignore error
-			}
 
 		}
-		else*/{
-			usart_put_string(string);
-		}
+		if(inHandlerMode())
+			portEND_SWITCHING_ISR(taskWoken);
+	}
+	else{
+		usart_put_string(string);
+	}
 }
 
 static void print_console_b(const char* b){

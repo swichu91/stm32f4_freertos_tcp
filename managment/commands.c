@@ -15,6 +15,10 @@
 #include "stm32f4xx_hal.h"
 #include "global_db.h"
 #include "udpd.h"
+#include "ff_headers.h"
+#include "ff_stdio.h"
+#include "FreeRTOS_Sockets.h"
+#include "FreeRTOS_ARP.h"
 
 
 extern char arg[DB_COUNT][DB_CMD_MAX_LEN];
@@ -227,6 +231,82 @@ void tasks_list_cmd(void *tsm)
 	print_console(buffer);
 
 
+}
+void arp_cmd( void *tsm)
+{
+	FreeRTOS_PrintARPCache();
+	print_console("\n");
+}
 
+
+void netstat_cmd( void *tsm)
+{
+	vTCPNetStat();
+}
+
+void DIR_cmd( void *tsm)
+{
+FF_FindData_t *pxFindStruct;
+const char  *pcAttrib;
+const char  *pcWritableFile = "writable file";
+const char  *pcReadOnlyFile = "read only file";
+const char  *pcDirectory = "directory";
+
+char*	dir_ptr="/usb";
+
+    /* FF_FindData_t can be large, so it is best to allocate the structure
+    dynamically, rather than declare it as a stack variable. */
+    pxFindStruct = ( FF_FindData_t * ) pvPortMalloc( sizeof( FF_FindData_t ) );
+
+    /* FF_FindData_t must be cleared to 0. */
+    memset( pxFindStruct, 0x00, sizeof( FF_FindData_t ) );
+
+    print_console(dir_ptr);
+    print_console("\r\n");
+
+    /* The first parameter to ff_findfist() is the directory being searched.  Do
+    not add wildcards to the end of the directory name. */
+    if( ff_findfirst( dir_ptr, pxFindStruct ) == 0 )
+    {
+        do
+        {
+            /* Point pcAttrib to a string that describes the file. */
+            if( ( pxFindStruct->ucAttributes & FF_FAT_ATTR_DIR ) != 0 )
+            {
+                pcAttrib = pcDirectory;
+            }
+            else if( pxFindStruct->ucAttributes & FF_FAT_ATTR_READONLY )
+            {
+                pcAttrib = pcReadOnlyFile;
+            }
+            else
+            {
+                pcAttrib = pcWritableFile;
+            }
+
+            /* Print the files name, size, and attribute string. */
+            FreeRTOS_printf((  "%s [%s] [size=%d]\r\n", pxFindStruct->pcFileName, pcAttrib, (int)pxFindStruct->ulFileSize  ));
+
+        } while( ff_findnext( pxFindStruct ) == 0 );
+    }
+
+    /* Free the allocated FF_FindData_t structure. */
+    vPortFree( pxFindStruct );
+}
+
+/*
+ * Pobiera current working directory w kontekscie tasku obslugujacego konsole,
+ * to znaczy,ze kazdy task ma swoja kopie current directory. Kazdy z taskow
+ * moze pracowac na calkiem innych sciezkach relatywnych
+ */
+
+void CWD_cmd( void *tsm)
+{
+
+	char pcBuffer[ 50 ];
+
+	 ff_getcwd( pcBuffer, sizeof( pcBuffer ) );
+	 FreeRTOS_printf(("%s\n",pcBuffer));
 
 }
+

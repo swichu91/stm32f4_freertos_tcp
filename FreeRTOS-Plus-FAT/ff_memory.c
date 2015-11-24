@@ -1,12 +1,12 @@
 /*
- * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
- * Authors include Hein Tibosch and Richard Barry
+ * FreeRTOS+FAT Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * Authors include James Walmsley, Hein Tibosch and Richard Barry
  *
  *******************************************************************************
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  ***                                                                         ***
  ***                                                                         ***
- ***   FREERTOS+TCP IS STILL IN THE LAB:                                     ***
+ ***   FREERTOS+FAT IS STILL IN THE LAB:                                     ***
  ***                                                                         ***
  ***   This product is functional and is already being used in commercial    ***
  ***   products.  Be aware however that we are still refining its design,    ***
@@ -24,9 +24,9 @@
  *******************************************************************************
  *
  * - Open source licensing -
- * While FreeRTOS+TCP is in the lab it is provided only under version two of the
+ * While FreeRTOS+FAT is in the lab it is provided only under version two of the
  * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+TCP is free to download, use and distribute under the
+ * license).  FreeRTOS+FAT is free to download, use and distribute under the
  * terms of that license provided the copyright notice and this text are not
  * altered or removed from the source files.  The GPL V2 text is available on
  * the gnu.org web site, and on the following
@@ -34,9 +34,9 @@
  * solely at the discretion of Real Time Engineers Ltd., be offered versions
  * under a license other then the GPL.
  *
- * FreeRTOS+TCP is distributed in the hope that it will be useful.  You cannot
- * use FreeRTOS+TCP unless you agree that you use the software 'as is'.
- * FreeRTOS+TCP is provided WITHOUT ANY WARRANTY; without even the implied
+ * FreeRTOS+FAT is distributed in the hope that it will be useful.  You cannot
+ * use FreeRTOS+FAT unless you agree that you use the software 'as is'.
+ * FreeRTOS+FAT is provided WITHOUT ANY WARRANTY; without even the implied
  * warranties of NON-INFRINGEMENT, MERCHANTABILITY or FITNESS FOR A PARTICULAR
  * PURPOSE. Real Time Engineers Ltd. disclaims all conditions and terms, be they
  * implied, expressed, or statutory.
@@ -49,27 +49,85 @@
  *
  */
 
-/*****************************************************************************
+/**
+ *	@file		ff_memory.c
+ *	@ingroup	MEMORY
  *
- * See the following URL for an explanation of this file:
- * http://www.FreeRTOS.org/FreeRTOS-Plus/FreeRTOS_Plus_TCP/Embedded_Compiler_Porting.html
+ *	@defgroup	MEMORY	FreeRTOS+FAT Memory Access Routines
+ *	@brief		Handles memory access in a portable way.
  *
- *****************************************************************************/
+ *	Provides simple, fast, and portable access to memory routines.
+ *	These are only used to read data from buffers. That are LITTLE ENDIAN
+ *	due to the FAT specification.
+ *
+ *	These routines may need to be modified to your platform.
+ *
+ **/
 
-/* Nothing to do here. */
+#include "ff_headers.h"
 
-
-
-
-
-
-
-
-
-
-
-
-
+/*
+ * Here below 3 x 2 access functions that allow the code
+ * not to worry about the endianness of the MCU.
+ */
 
 
+#if( ffconfigINLINE_MEMORY_ACCESS == 0 )
 
+uint8_t FF_getChar( const uint8_t *pBuffer, uint32_t aOffset )
+{
+	return ( uint8_t ) ( pBuffer[ aOffset ] );
+}
+
+uint16_t FF_getShort( const uint8_t *pBuffer, uint32_t aOffset )
+{
+FF_T_UN16 u16;
+
+	pBuffer += aOffset;
+	u16.bytes.u8_1 = pBuffer[ 1 ];
+	u16.bytes.u8_0 = pBuffer[ 0 ];
+
+	return u16.u16;
+}
+
+uint32_t FF_getLong( const uint8_t *pBuffer, uint32_t aOffset )
+{
+FF_T_UN32 u32;
+
+	pBuffer += aOffset;
+	u32.bytes.u8_3 = pBuffer[ 3 ];
+	u32.bytes.u8_2 = pBuffer[ 2 ];
+	u32.bytes.u8_1 = pBuffer[ 1 ];
+	u32.bytes.u8_0 = pBuffer[ 0 ];
+
+	return u32.u32;
+}
+
+void FF_putChar( uint8_t *pBuffer, uint32_t aOffset, uint32_t Value )
+{
+	pBuffer[ aOffset ] = ( uint8_t ) Value;
+}
+
+void FF_putShort( uint8_t *pBuffer, uint32_t aOffset, uint32_t Value )
+{
+FF_T_UN16 u16;
+
+	u16.u16 = ( uint16_t ) Value;
+	pBuffer += aOffset;
+	pBuffer[ 0 ] = u16.bytes.u8_0;
+	pBuffer[ 1 ] = u16.bytes.u8_1;
+}
+
+void FF_putLong( uint8_t *pBuffer, uint32_t aOffset, uint32_t Value )
+{
+FF_T_UN32 u32;
+
+	u32.u32 = Value;
+	pBuffer += aOffset;
+	pBuffer[ 0 ] = u32.bytes.u8_0;
+	pBuffer[ 1 ] = u32.bytes.u8_1;
+	pBuffer[ 2 ] = u32.bytes.u8_2;
+	pBuffer[ 3 ] = u32.bytes.u8_3;
+}
+
+#endif

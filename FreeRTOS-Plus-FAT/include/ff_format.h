@@ -1,12 +1,12 @@
 /*
- * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
- * Authors include Hein Tibosch and Richard Barry
+ * FreeRTOS+FAT Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * Authors include James Walmsley, Hein Tibosch and Richard Barry
  *
  *******************************************************************************
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  ***                                                                         ***
  ***                                                                         ***
- ***   FREERTOS+TCP IS STILL IN THE LAB:                                     ***
+ ***   FREERTOS+FAT IS STILL IN THE LAB:                                     ***
  ***                                                                         ***
  ***   This product is functional and is already being used in commercial    ***
  ***   products.  Be aware however that we are still refining its design,    ***
@@ -24,9 +24,9 @@
  *******************************************************************************
  *
  * - Open source licensing -
- * While FreeRTOS+TCP is in the lab it is provided only under version two of the
+ * While FreeRTOS+FAT is in the lab it is provided only under version two of the
  * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+TCP is free to download, use and distribute under the
+ * license).  FreeRTOS+FAT is free to download, use and distribute under the
  * terms of that license provided the copyright notice and this text are not
  * altered or removed from the source files.  The GPL V2 text is available on
  * the gnu.org web site, and on the following
@@ -34,9 +34,9 @@
  * solely at the discretion of Real Time Engineers Ltd., be offered versions
  * under a license other then the GPL.
  *
- * FreeRTOS+TCP is distributed in the hope that it will be useful.  You cannot
- * use FreeRTOS+TCP unless you agree that you use the software 'as is'.
- * FreeRTOS+TCP is provided WITHOUT ANY WARRANTY; without even the implied
+ * FreeRTOS+FAT is distributed in the hope that it will be useful.  You cannot
+ * use FreeRTOS+FAT unless you agree that you use the software 'as is'.
+ * FreeRTOS+FAT is provided WITHOUT ANY WARRANTY; without even the implied
  * warranties of NON-INFRINGEMENT, MERCHANTABILITY or FITNESS FOR A PARTICULAR
  * PURPOSE. Real Time Engineers Ltd. disclaims all conditions and terms, be they
  * implied, expressed, or statutory.
@@ -49,27 +49,52 @@
  *
  */
 
-/*****************************************************************************
+/**
+ *	@file		ff_format.c
+ *	@ingroup	FORMAT
  *
- * See the following URL for an explanation of this file:
- * http://www.FreeRTOS.org/FreeRTOS-Plus/FreeRTOS_Plus_TCP/Embedded_Compiler_Porting.html
- *
- *****************************************************************************/
-
-/* Nothing to do here. */
+ **/
 
 
+#ifndef _FF_FORMAT_H_
+#define _FF_FORMAT_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 
+#ifndef PLUS_FAT_H
+	#error this header will be included from "plusfat.h"
+#endif
 
+/*---------- PROTOTYPES */
+/* PUBLIC (Interfaces): */
 
+typedef enum _FF_SizeType {
+	eSizeIsQuota,    /* Assign a quotum (sum of xSizes is free, all disk space will be allocated) */
+	eSizeIsPercent,  /* Assign a percentage of the available space (sum of xSizes must be <= 100) */
+	eSizeIsSectors,  /* Assign fixed number of sectors (sum of xSizes must be < ulSectorCount) */
+} eSizeType_t;
 
+typedef struct _FF_PartitionParameters {
+	uint32_t ulSectorCount;     /* Total number of sectors on the disk, including hidden/reserved */
+								/* Must be obtained from the block driver */
+	uint32_t ulHiddenSectors;   /* Keep at least these initial sectors free  */
+	uint32_t ulInterSpace;      /* Number of sectors to keep free between partitions (when 0 -> 2048) */
+	BaseType_t xSizes[ ffconfigMAX_PARTITIONS ];  /* E.g. 80, 20, 0, 0 (see eSizeType) */
+    BaseType_t xPrimaryCount;    /* The number of partitions that must be "primary" */
+	eSizeType_t eSizeType;
+} FF_PartitionParameters_t;
 
+FF_Error_t FF_Partition( FF_Disk_t *pxDisk, FF_PartitionParameters_t *pParams );
 
+FF_Error_t FF_Format( FF_Disk_t *pxDisk, BaseType_t xPartitionNumber, BaseType_t xPreferFAT16, BaseType_t xSmallClusters );
 
+/* Private : */
 
+#ifdef	__cplusplus
+} /* extern "C" */
+#endif
 
-
-
-
-
+#endif

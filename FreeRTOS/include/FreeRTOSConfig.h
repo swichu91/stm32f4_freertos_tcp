@@ -99,7 +99,7 @@
 #define configMAX_PRIORITIES			( 8 )
 #define configMINIMAL_STACK_SIZE		( ( unsigned short ) 96 )
 #define configTOTAL_HEAP_SIZE			( ( size_t ) ( 75 * 1024 ) )
-#define configMAX_TASK_NAME_LEN			( 15 )
+#define configMAX_TASK_NAME_LEN			( 16 )
 #define configUSE_TRACE_FACILITY		1
 #define configUSE_16_BIT_TICKS			0
 #define configIDLE_SHOULD_YIELD			1
@@ -110,6 +110,8 @@
 #define configUSE_MALLOC_FAILED_HOOK	1
 #define configUSE_APPLICATION_TASK_TAG	0
 #define configUSE_COUNTING_SEMAPHORES	1
+
+#define configNUM_THREAD_LOCAL_STORAGE_POINTERS 5
 
 //#define configGENERATE_RUN_TIME_STATS	1
 #define	configUSE_STATS_FORMATTING_FUNCTIONS 1

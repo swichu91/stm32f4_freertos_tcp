@@ -23,6 +23,9 @@
 
 #include "global_db.h"
 
+#include "ff_headers.h"
+#include "ff_stdio.h"
+
 
 
 extern QueueHandle_t CANFramesQueue;
@@ -175,12 +178,20 @@ BaseType_t lReturned;
    }
 }
 
-#define BUFFER_SIZE 512
+const char* head1 = "HTTP/1.1 200 OK\n";
+const char* head2 = "Content-length: ";
+const char* head3 = "Content-Type: text/html\nKeep-Alive: timeout=15, max=100\nConnection: keep-alive\n\n";
+
+char buffik[200];
+char buff[50];
+
+#define BUFFER_SIZE 10000
+char cRxedData[ BUFFER_SIZE ];
 void prvServerConnectionInstance( void *pvParameters )
 {
 
 	xSocket_t xSocket;
-	char cRxedData[ BUFFER_SIZE ];
+
 	BaseType_t lBytesReceived;
 	static const TickType_t keep_alive_time = 15000;
 
@@ -206,16 +217,59 @@ void prvServerConnectionInstance( void *pvParameters )
 	            /* Data was received, process it here. */
 	           // FreeRTOS_send(xSocket,cRxedData,lBytesReceived,0);
 
-	           FreeRTOS_send(xSocket,"HTTP/1.1 200 OK\n", 16,0);
-	           FreeRTOS_send(xSocket,"Content-length: 59\n", 19,0);
-	           FreeRTOS_send(xSocket,"Content-Type: text/html\n", 24,0);
-	           FreeRTOS_send(xSocket,"Keep-Alive: timeout=15, max=100\n", 32,0);
-	           FreeRTOS_send(xSocket,"Connection: keep-alive\n\n", 25,0);
-	           FreeRTOS_send(xSocket,"<html><body><H1>Pozdrowienia dla misiora!</H1></body></html>",59,0);
+		        FF_FILE* fd;
+		        long lSize, lRead = 0L;
+		        uint32_t read_t=0,size_t=0;
 
-	            cRxedData[lBytesReceived] = '\0';
+	        	memset(cRxedData,0,sizeof(cRxedData));
 
-	            print_console(cRxedData);
+	           FreeRTOS_send(xSocket,head1, strlen(head1),0);
+
+	           strcat(buffik,head2);
+
+	           /* Open the pxFile specified by the pcFileName parameter. */
+	           fd = ff_fopen( "/usb/Picture 012.jpg", "r" );
+
+	           if( fd != NULL )
+	           {
+	               /* Determine the size of the file. */
+	               lSize = 10000000;//ff_filelength( fd );
+
+	               sprintf(buff,"%lu\n",lSize);
+	               strcat(buffik,buff);
+
+	               FreeRTOS_send(xSocket,buffik, strlen(buffik),0);
+	               FreeRTOS_send(xSocket,head3, strlen(head3),0);
+
+	               while(lRead != lSize)
+	               {
+
+	            	   if( (lSize-lRead) > BUFFER_SIZE )
+	            	   {
+	            		   size_t = BUFFER_SIZE;
+	            	   }
+
+	               	   /* Read the entire file. */
+	            	   read_t = 10000;//ff_fread( cRxedData, 1, size_t, fd );
+	            	   lRead +=read_t;
+	               	   FreeRTOS_send(xSocket,cRxedData, read_t,0);
+
+	               }
+
+	               /* Close the file again. */
+	               ff_fclose( fd );
+	           }
+
+
+	          // FreeRTOS_send(xSocket,"Content-length: 59\n", 19,0);
+	          // FreeRTOS_send(xSocket,"Content-Type: text/html\n", 24,0);
+	           //FreeRTOS_send(xSocket,"Keep-Alive: timeout=15, max=100\n", 32,0);
+	          // FreeRTOS_send(xSocket,"Connection: keep-alive\n\n", 25,0);
+	          // FreeRTOS_send(xSocket,"<html><body><H1>Pozdrowienia dla misiora!</H1></body></html>",59,0);
+
+	            //cRxedData[lBytesReceived] = '\0';
+
+	            //print_console(cRxedData);
 
 	            //char buffer[50];
 	        	        //    sprintf(buffer,"Bytes received:%d\r\n",lBytesReceived);
@@ -330,6 +384,24 @@ const BaseType_t xBacklog = 20;
         configASSERT( xConnectedSocket != FREERTOS_INVALID_SOCKET );
         if( xConnectedSocket && xConnectedSocket != FREERTOS_INVALID_SOCKET)
         {
+			#if( ipconfigUSE_TCP_WIN == 1 )
+        		WinProperties_t xWinProps;
+
+        		/* Fill in the buffer and window sizes that will be used by the socket. */
+        		xWinProps.lTxBufSize = ipconfigTCP_TX_BUF_LEN;
+        		xWinProps.lTxWinSize = 4;
+        		xWinProps.lRxBufSize = ipconfigTCP_RX_BUF_LEN;
+        		xWinProps.lRxWinSize = 1;
+			#endif /* ipconfigUSE_TCP_WIN */
+
+        	/* Set the window and buffer sizes. */
+			#if( ipconfigUSE_TCP_WIN == 1 )
+        	{
+        		FreeRTOS_setsockopt( xConnectedSocket, 0, FREERTOS_SO_WIN_PROPERTIES, ( void * ) &xWinProps, sizeof( xWinProps ) );
+        	}
+			#endif /* ipconfigUSE_TCP_WIN */
+
+
         	//print_console("connected\r\n");
 
         /* Spawn a RTOS task to handle the connection. */

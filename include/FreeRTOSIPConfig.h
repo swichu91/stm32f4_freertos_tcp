@@ -65,6 +65,7 @@
 #include <stdio.h>
 #include "stm32f407xx.h"
 #include "stm32f4xx_hal.h"
+#include "print_macros.h"
 
 /*
  * Moje define do konfiguracji mac/phy
@@ -83,11 +84,6 @@ console before the network is connected then a UDP port after the network has
 connected. */
 extern void vLoggingPrintf( const char *pcFormatString, ... );
 
-
-char buforr[1000];
-#define TCP_SPRINTF(...) sprintf(buforr,__VA_ARGS__)
-
-
 /* Set to 1 to print out debug messages.  If ipconfigHAS_DEBUG_PRINTF is set to
 1 then FreeRTOS_debug_printf should be defined to the function used to print
 out the debugging messages. */
@@ -101,10 +97,10 @@ FreeRTOS_netstat() command, and ping replies.  If ipconfigHAS_PRINTF is set to 1
 then FreeRTOS_printf should be set to the function used to print out the
 messages. */
 
-#define ipconfigHAS_PRINTF			0
+#define ipconfigHAS_PRINTF			1
 #if( ipconfigHAS_PRINTF == 1 )
 
-	#define FreeRTOS_printf(X)			do { TCP_SPRINTF X; print_console(buforr); } while (0)
+	#define FreeRTOS_printf( X )		FreeRTOS_printfx X
 #endif
 
 /* Define the byte order of the target MCU (the MCU FreeRTOS+TCP is executing
@@ -252,7 +248,7 @@ to a pre-determinable value. */
 stack.  ipconfigEVENT_QUEUE_LENGTH sets the maximum number of events that can
 be queued for processing at any one time.  The event queue must be a minimum of
 5 greater than the total number of network buffers. */
-#define ipconfigEVENT_QUEUE_LENGTH		( ipconfigNUM_NETWORK_BUFFER_DESCRIPTORS + 5 )
+#define ipconfigEVENT_QUEUE_LENGTH		( ipconfigNUM_NETWORK_BUFFER_DESCRIPTORS + 6 )
 
 /* The address of a socket is the combination of its IP address and its port
 number.  FreeRTOS_bind() is used to manually allocate a port number to a socket
@@ -276,7 +272,7 @@ aborted. */
 #define ipconfigUSE_TCP				( 1 )
 
 /* USE_WIN: Let TCP use windowing mechanism. */
-#define ipconfigUSE_TCP_WIN			( 0 )
+#define ipconfigUSE_TCP_WIN			( 1 )
 
 /* The MTU is the maximum number of bytes the payload of a network frame can
 contain.  For normal Ethernet V2 frames the maximum MTU is 1500.  Setting a
@@ -336,14 +332,14 @@ This has to do with the contents of the IP-packets: all 32-bit fields are
 TCP socket will use up to 2 x 6 descriptors, meaning that it can have 2 x 6
 outstanding packets (for Rx and Tx).  When using up to 10 TP sockets
 simultaneously, one could define TCP_WIN_SEG_COUNT as 120. */
-#define ipconfigTCP_WIN_SEG_COUNT 240
+#define ipconfigTCP_WIN_SEG_COUNT 120
 
 /* Each TCP socket has a circular buffers for Rx and Tx, which have a fixed
 maximum size.  Define the size of Rx buffer for TCP sockets. */
 #define ipconfigTCP_RX_BUF_LEN			( 4 * ipconfigTCP_MSS ) // todo: tutaj ostroznie, nie wiem czy z ramem sie wyrobie
 
 /* Define the size of Tx buffer for TCP sockets. */
-#define ipconfigTCP_TX_BUF_LEN			( 4 * ipconfigTCP_MSS )
+#define ipconfigTCP_TX_BUF_LEN			( 8 * ipconfigTCP_MSS )
 
 
 

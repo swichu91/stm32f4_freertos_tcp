@@ -1,0 +1,10 @@
+Changes since 150825 labs release:
+
+	+ Issue fixed in FF_Move().
+	+ Improved handling of files and directories that start with a '.' character.
+	+ Changed the locking mechanisms from mutexes to an event group.
+	+ Add FF_ERR_DRIVER_NOMEDIUM to better handle media being removed and
+	  re-inserted.
+	+ Fix re-entrancy issue in FF_CheckValid().
+	+ Remove hashes for deleted files.
+	+ General structural work.

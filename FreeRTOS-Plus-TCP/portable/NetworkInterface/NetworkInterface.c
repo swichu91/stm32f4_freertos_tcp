@@ -32,6 +32,7 @@ access functions. */
 
 #include "udpd.h"
 #include "global_db.h"
+#include "sntp.h"
 
 
 /* Global Ethernet handle*/
@@ -570,6 +571,9 @@ uint32_t i=0;
         	// else print_console("Creating UDP/CAN Tx -- > failed\r\n");
         	 if(xTaskCreate(vCreateTCPServerSocket,"tcprx",1024,NULL,0,NULL)==pdPASS)print_console("Creating TCP task --> OK\r\n");
         	 else print_console("Creating TCP task -- > failed\r\n");
+
+        	 SNTP_init();
+
 
 
              xTasksAlreadyCreated = pdTRUE;

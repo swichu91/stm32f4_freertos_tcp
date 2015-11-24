@@ -176,6 +176,7 @@ struct xDNSMessage
 	uint16_t usAdditionalRRs;
 }
 #include "pack_struct_end.h"
+; //TODO: wymagane tylko dla Eclipse bo cos parser nie lyka tricku z include
 typedef struct xDNSMessage DNSMessage_t;
 
 /* A DNS query consists of a header, as described in 'struct xDNSMessage'
@@ -189,6 +190,7 @@ struct xDNSTail
 	uint16_t usClass;
 }
 #include "pack_struct_end.h"
+; //TODO: wymagane tylko dla Eclipse bo cos parser nie lyka tricku z include
 typedef struct xDNSTail DNSTail_t;
 
 #if( ipconfigUSE_LLMNR == 1 )

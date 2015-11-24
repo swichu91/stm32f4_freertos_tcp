@@ -18,6 +18,13 @@
 #include "udpd.h"
 #include "can.h"
 #include "global_db.h"
+#include "ff_headers.h"
+#include "ff_ramdisk.h"
+#include "usb_host.h"
+#include "ff_usbh.h"
+#include "usbh_msc.h"
+#include "ff_stdio.h"
+
 
 // Prêdkosci poszczegolnych szyn:
 // AHB -> 168MHz
@@ -54,12 +61,6 @@ const char* welcome_logo =	"\r\nWelcome!\r\n" \
 		"Software Version : 1.00 alpha\r\n" \
 		"Created by: Mateusz Piesta\r\n\r\n\r\n"; \
 
-
-
-
-
-
-
 void vApplicationTickHook( void ) {
     ++tickTime;
 
@@ -71,6 +72,7 @@ void vApplicationTickHook( void ) {
 void vApplicationIdleHook( void ) {
 
     ++u64IdleTicksCnt;
+   // MX_USB_HOST_Process();
    // GPIOD->ODR ^=GPIO_ODR_ODR_13;
 }
 
@@ -101,9 +103,8 @@ void vBlinkLed (void * pvparameters){
 
 		vTaskDelay(500 / portTICK_RATE_MS);
 		GPIOD->ODR ^=GPIO_ODR_ODR_12;
-
+		FF_USBH_d(usbhDisk);
 	}
-
 
 }
 
@@ -134,9 +135,12 @@ void Main_task (void * pvparameters)
 	//print welcome msg with actual software version
 	print_console(welcome_logo);
 	console_mngt_init();
-	xTaskCreate(vBlinkLed, "Blink Led",configMINIMAL_STACK_SIZE,NULL,0,NULL);
+	MX_USB_HOST_Init();
+	xTaskCreate(vBlinkLed, "Blink Led",10*configMINIMAL_STACK_SIZE,NULL,0,NULL);
     xTaskCreate(prvEMACDeferredInterruptHandlerTask,"EthRcvTask",configMINIMAL_STACK_SIZE,NULL,configMAX_PRIORITIES-3,NULL);
 
+	//prvCreateDiskAndExampleFiles(); //TODO: nie postawie fata na ramie w procku bo mam go za malo... minimalnie to 2Mb
+    //sprvCreateDiskAndExampleFiles();
 
 	/* The MAC address array is not declared const as the MAC address will
 	normally be read from an EEPROM and not hard coded (in real deployed
@@ -165,10 +169,41 @@ void Main_task (void * pvparameters)
 	vTaskDelete(NULL);
 }
 
+void SystemClock_Config(void)
+{
 
+  RCC_OscInitTypeDef RCC_OscInitStruct;
+  RCC_ClkInitTypeDef RCC_ClkInitStruct;
 
+  __PWR_CLK_ENABLE();
 
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 336;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
+  HAL_RCC_OscConfig(&RCC_OscInitStruct);
+
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_SYSCLK|RCC_CLOCKTYPE_PCLK1
+                              |RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+  HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
+
+  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+
+  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+
+  /* SysTick_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+}
 
 
 
@@ -180,12 +215,13 @@ main(int argc, char* argv[])
 
 	HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
+	SystemClock_Config();
+
 	gdb_init();
 
 	init_system_led();
 
-	usart_init(3000000); // usart na 3MHz to jest maks co ft232 moze wyciagnac
-
+	usart_init(3000000); // usart na 3MHz to jest smaks co ft232 moze wyciagnac
 
 	//can_init(1024);
 
