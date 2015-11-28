@@ -49,7 +49,7 @@ const char CMD_PRMT	=		0x3E;
 /*
  * Declarations
  */
-static void usart_put_string(const char* string);
+void usart_put_string(const char* string);
 static void usart_put_char(char byte);
 static void console_mngt_clear_line(console_mngt_t* ptr);
 static void console_mngt_interpreter(console_mngt_t* ptr,char len, void *tsm);
@@ -110,7 +110,8 @@ const _action_command comm_act[] =
 		 {"netstat",		 netstat_cmd},
 		 {"arp",		 	 arp_cmd},
 		 {"dir",		 	 DIR_cmd},
-		 {"cwd",		 	 CWD_cmd}
+		 {"cwd",		 	 CWD_cmd},
+		 {"time",	 	 	 time_cmd}
 
 
 
@@ -488,7 +489,7 @@ static void usart_put_char(char byte)
 
 }
 
-static void usart_put_string(const char* string)
+void usart_put_string(const char* string)
 {
 
 

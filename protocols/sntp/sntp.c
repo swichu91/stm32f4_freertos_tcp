@@ -10,11 +10,29 @@
 #include "string.h"
 #include "print_macros.h"
 #include "task.h"
+#include "server_config.h"
 
 
 const char* s_task_create_ok ="Creating SNTP task --> OK\n";
 const char* s_task_create_fail = "Creating SNTP task -- > failed\n";
 const char* s_KOD = "Kiss-of-death response";
+
+
+//na razie tutaj, docelowo w obsludze RTC to bedzie
+//returns the number of seconds after 1-1-1970. */
+time_t FreeRTOS_time( time_t *pxTime )
+{
+time_t xReturn;
+
+	xReturn = (time_t)sys_time.sec_1990 - DIFF_SEC_1900_1970;
+
+	if( pxTime != NULL )
+	{
+		*pxTime = xReturn;
+	}
+
+	return xReturn;
+}
 
 
 static void SNTP_thread(void* pvp);
@@ -77,6 +95,8 @@ static void getDate(uint32_t sec,struct stime* time)
 
 	  sec +=retPeriodofYearTime(time);
 
+	  time->sec_1990 = sec;
+
 	  time->sec = (uint32_t)(sec % 60);
 	  sec /= 60;
 	  time->min = (uint32_t)(sec % 60);
@@ -131,6 +151,8 @@ static void SNTP_thread(void* pvp)
 
 	sys_time.timezone = 1;
 
+	params.poll_interval = SNTP_POLL_INTERVAL;
+
     /* Attempt to open the socket. */
     params.socket = FreeRTOS_socket( FREERTOS_AF_INET,
     									 FREERTOS_SOCK_DGRAM,
@@ -167,13 +189,16 @@ static void SNTP_thread(void* pvp)
         	if(sntpresponse.stratum == SNTP_STRATUM_KOD)
         	{
         		print_gen(s_KOD);
+        		params.poll_interval +=1000;
 
         	}
         	else if (((sntpresponse.li_vn_mode & SNTP_MODE_MASK) == SNTP_MODE_SERVER) ||
                     ((sntpresponse.li_vn_mode & SNTP_MODE_MASK) == SNTP_MODE_BROADCAST))
         	{
         		getDate(FreeRTOS_ntohl(sntpresponse.receive_timestamp[0]),&sys_time);
-        		PRINT_SYSTIME;
+				#if SNTP_PRINT_LOG
+        			PRINT_SYSTIME;
+				#endif
         	}
         }
         else //error
@@ -181,14 +206,14 @@ static void SNTP_thread(void* pvp)
 
         }
 
-        vTaskDelay(SNTP_POLL_INTERVAL);
+        vTaskDelay(params.poll_interval);
     }
 }
 
 
 void SNTP_init(void)
 {
-	#if USE_SNTP
+	#if ipconfigUSE_SNTP
 
 	 if(xTaskCreate(SNTP_thread,SNTP_THREAD_NAME,SNTP_THREAD_STACK_SIZE,NULL,SNTP_THREAD_PRIO,NULL)==pdPASS)
 		 print_console(s_task_create_ok);

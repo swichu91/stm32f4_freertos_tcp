@@ -13,6 +13,8 @@
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_Sockets.h"
 
+#define SNTP_PRINT_LOG				0
+
 
 
 #define SNTP_THREAD_STACK_SIZE		(2*configMINIMAL_STACK_SIZE)
@@ -54,6 +56,7 @@ struct stime
 	uint16_t year;
 
 	int8_t  timezone;
+	uint64_t sec_1990;
 
 }sys_time;
 
@@ -62,6 +65,7 @@ struct sntp_c
 	xSocket_t					socket;
 	uint16_t 					port;
 	struct freertos_sockaddr 	xClient;
+	uint16_t					poll_interval;
 
 };
 
@@ -81,5 +85,6 @@ struct sntp_msg {
 };
 
 void SNTP_init(void);
+time_t FreeRTOS_time( time_t *pxTime );
 
 #endif /* SNTP_H_ */

@@ -24,6 +24,9 @@
 #include "ff_usbh.h"
 #include "usbh_msc.h"
 #include "ff_stdio.h"
+#include "server_config.h"
+#include "FreeRTOS_TCP_server.h"
+#include "FreeRTOS_server_private.h"
 
 
 // Prêdkosci poszczegolnych szyn:
@@ -79,7 +82,8 @@ void vApplicationIdleHook( void ) {
 // A required FreeRTOS function.
 // ----------------------------------------------------------------------------
 void vApplicationMallocFailedHook( void ) {
-    configASSERT( 0 );  // Latch on any failure / error.
+    //configASSERT( 0 );  // Latch on any failure / error.
+	print_console("Malloc failed!\n");
 
 }
 
@@ -91,8 +95,10 @@ void vApplicationStackOverflowHook( TaskHandle_t pxTask, signed char *pcTaskName
 	/* Run time stack overflow checking is performed if
 	configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2.  This hook
 	function is called if a stack overflow is detected. */
-	taskDISABLE_INTERRUPTS();
-	for( ;; );
+	//taskDISABLE_INTERRUPTS();
+	//for( ;; );
+	print_console("Holy FUCK! STACK OVERFLOW !!\n");
+
 }
 
 
@@ -136,7 +142,7 @@ void Main_task (void * pvparameters)
 	print_console(welcome_logo);
 	console_mngt_init();
 	MX_USB_HOST_Init();
-	xTaskCreate(vBlinkLed, "Blink Led",10*configMINIMAL_STACK_SIZE,NULL,0,NULL);
+	xTaskCreate(vBlinkLed, "Blink Led",3*configMINIMAL_STACK_SIZE,NULL,0,NULL);
     xTaskCreate(prvEMACDeferredInterruptHandlerTask,"EthRcvTask",configMINIMAL_STACK_SIZE,NULL,configMAX_PRIORITIES-3,NULL);
 
 	//prvCreateDiskAndExampleFiles(); //TODO: nie postawie fata na ramie w procku bo mam go za malo... minimalnie to 2Mb
@@ -206,6 +212,67 @@ void SystemClock_Config(void)
 }
 
 
+/* Handle of the task that runs the FTP and HTTP servers. */
+TaskHandle_t xServerWorkTaskHandle = NULL;
+
+
+/*-----------------------------------------------------------*/
+
+#if( ( ipconfigUSE_FTP == 1 ) || ( ipconfigUSE_HTTP == 1 ) )
+
+	static void prvServerWorkTask( void *pvParameters )
+	{
+	xTCPServer *pxTCPServer = NULL;
+	const TickType_t xInitialBlockTime = pdMS_TO_TICKS( 200UL );
+
+	/* A structure that defines the servers to be created.  Which servers are
+	included in the structure depends on the mainCREATE_HTTP_SERVER and
+	mainCREATE_FTP_SERVER settings at the top of this file. */
+	static const struct xSERVER_CONFIG xServerConfiguration[] =
+	{
+		#if( ipconfigUSE_HTTP == 1 )
+				/* Server type,		port number,	backlog, 	root dir. */
+				{ eSERVER_HTTP, 	80, 			12, 		configHTTP_ROOT },
+		#endif
+
+		#if( ipconfigUSE_FTP == 1 )
+				/* Server type,		port number,	backlog, 	root dir. */
+				{ eSERVER_FTP,  	21, 			12, 		"" }
+		#endif
+	};
+
+		/* Remove compiler warning about unused parameter. */
+		( void ) pvParameters;
+
+		/* The priority of this task can be raised now the disk has been
+		initialised. */
+		vTaskPrioritySet( NULL, mainTCP_SERVER_TASK_PRIORITY );
+
+		/* If the CLI is included in the build then register commands that allow
+		the file system to be accessed. */
+		#if( mainCREATE_UDP_CLI_TASKS == 1 )
+		{
+			vRegisterFileSystemCLICommands();
+		}
+		#endif /* mainCREATE_UDP_CLI_TASKS */
+
+
+		/* Wait until the network is up before creating the servers.  The
+		notification is given from the network event hook. */
+		ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
+
+		/* Create the servers defined by the xServerConfiguration array above. */
+		pxTCPServer = FreeRTOS_CreateTCPServer( xServerConfiguration, sizeof( xServerConfiguration ) / sizeof( xServerConfiguration[ 0 ] ) );
+		configASSERT( pxTCPServer );
+
+		for( ;; )
+		{
+			FreeRTOS_TCPServerWork( pxTCPServer, xInitialBlockTime );
+		}
+	}
+
+#endif /* ( ( mainCREATE_FTP_SERVER == 1 ) || ( mainCREATE_HTTP_SERVER == 1 ) ) */
+/*-----------------------------------------------------------*/
 
 int
 main(int argc, char* argv[])
@@ -225,6 +292,14 @@ main(int argc, char* argv[])
 
 	//can_init(1024);
 
+	#if( ( ipconfigUSE_FTP == 1 ) || ( ipconfigUSE_HTTP == 1 ) )
+	{
+		/* Create the task that handles the FTP and HTTP servers.The task is created at the idle
+		priority, and sets itself to mainTCP_SERVER_TASK_PRIORITY after the file
+		system has initialised. */
+		xTaskCreate( prvServerWorkTask, "SvrWork", mainTCP_SERVER_STACK_SIZE, NULL, tskIDLE_PRIORITY, &xServerWorkTaskHandle );
+	}
+	#endif
 	xTaskCreate(Main_task,"Main", 8096, NULL,7, NULL);
 
 	vTaskStartScheduler(); // This should never return.

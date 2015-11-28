@@ -61,6 +61,7 @@ char arg[DB_COUNT][DB_CMD_MAX_LEN];
 static const char cmd_not_found[]="\r\nCommand not found\r\n";
 
 void print_console (const char * string);
+void usart_put_string(const char* string);
 void console_mngt_init(void);
 
 void usart_init(uint32_t baudrate);

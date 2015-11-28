@@ -101,28 +101,6 @@ static int32_t prvReadRAM( uint8_t *pucBuffer, uint32_t ulSectorNumber, uint32_t
 static FF_Error_t prvPartitionAndFormatDisk( FF_Disk_t *pxDisk );
 
 
-
-
-
-
-
-time_t FreeRTOS_time( time_t *pxTime )
-{
-time_t xReturn;
-
-	xReturn = 5000000;
-
-	if( pxTime != NULL )
-	{
-		*pxTime = xReturn;
-	}
-
-	return xReturn;
-}
-
-
-
-
 /*-----------------------------------------------------------*/
 
 /* This is the prototype of the function used to initialise the RAM disk driver.

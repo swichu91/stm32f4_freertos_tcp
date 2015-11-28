@@ -33,6 +33,7 @@ access functions. */
 #include "udpd.h"
 #include "global_db.h"
 #include "sntp.h"
+#include "FreeRTOS_server_private.h"
 
 
 /* Global Ethernet handle*/
@@ -545,6 +546,8 @@ uint32_t i=0;
 }
 
 
+extern TaskHandle_t xServerWorkTaskHandle;
+
  /* Defined by the application code, but called by FreeRTOS+UDP when the network
  connects/disconnects (if ipconfigUSE_NETWORK_EVENT_HOOK is set to 1 in
  FreeRTOSIPConfig.h). */
@@ -563,18 +566,15 @@ uint32_t i=0;
          created. */
          if( xTasksAlreadyCreated == pdFALSE )
          {
-
-        	 if(xTaskCreate(vUDPReceiveDeamon,"udprx",UDPD_STACK_SIZE,NULL,UDPD_PRIO,NULL)==pdPASS) print_console("Creating UDP Ping Pong task -- > OK\r\n");
-        	 else print_console("Creating UDP Ping Pong task -- > failed\r\n");
-
         	 //if(xTaskCreate(vUDPTransmitCANFramesTask,"Tx CAN/UDP",UDPD_CAN_TX_SIZE,NULL,UDP_CAN_TX_PRIO,NULL)==pdPASS) print_console("Creating UDP/CAN Tx task -- > OK\r\n");
         	// else print_console("Creating UDP/CAN Tx -- > failed\r\n");
-        	 if(xTaskCreate(vCreateTCPServerSocket,"tcprx",1024,NULL,0,NULL)==pdPASS)print_console("Creating TCP task --> OK\r\n");
-        	 else print_console("Creating TCP task -- > failed\r\n");
 
         	 SNTP_init();
 
-
+        	//daj znac taskowi do obslugi http/ftp,ze moze utworzyc sockety
+			#if ipconfigUSE_HTTP==1 || ipconfigUSE_FTP==1
+        	 	 xTaskNotifyGive( xServerWorkTaskHandle );
+			#endif
 
              xTasksAlreadyCreated = pdTRUE;
          }

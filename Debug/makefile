@@ -14,8 +14,11 @@ RM := rm -rf
 -include system/src/cortexm/subdir.mk
 -include system/src/cmsis/subdir.mk
 -include src/subdir.mk
--include network/sntp/subdir.mk
--include network/subdir.mk
+-include protocols/sntp/subdir.mk
+-include protocols/http/subdir.mk
+-include protocols/ftp/subdir.mk
+-include protocols/common/subdir.mk
+-include protocols/subdir.mk
 -include managment/subdir.mk
 -include USB_Host/USB-Host-Library/subdir.mk
 -include USB_Host/subdir.mk

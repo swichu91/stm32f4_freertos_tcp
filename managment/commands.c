@@ -232,9 +232,19 @@ void tasks_list_cmd(void *tsm)
 
 
 }
+
+void time_cmd(void *tsm)
+{
+	PRINT_SYSTIME;
+}
+
+
 void arp_cmd( void *tsm)
 {
-	FreeRTOS_PrintARPCache();
+	if(!*arg[1])
+		FreeRTOS_PrintARPCache();
+	else if (!strcmp(arg[1],"-d"))
+		FreeRTOS_ClearARP();
 	print_console("\n");
 }
 

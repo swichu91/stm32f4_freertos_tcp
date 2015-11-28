@@ -9,6 +9,7 @@ void commlist_cmd(void *tsm);
 void show_cmd(void *tsm);
 void udp_cmd(void *tsm);
 void tasks_list_cmd(void *tsm);
+void time_cmd(void *tsm);
 
 void netstat_cmd( void *tsm);
 void arp_cmd( void *tsm);

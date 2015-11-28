@@ -214,6 +214,8 @@ void prvServerConnectionInstance( void *pvParameters )
 
 	        if( lBytesReceived > 0 )
 	        {
+	        	if(strncmp(cRxedData,"GET",3)) continue;
+
 	            /* Data was received, process it here. */
 	           // FreeRTOS_send(xSocket,cRxedData,lBytesReceived,0);
 
@@ -407,7 +409,7 @@ const BaseType_t xBacklog = 20;
         /* Spawn a RTOS task to handle the connection. */
                 xTaskCreate( prvServerConnectionInstance,
                              "EchoServer",
-                             2048,
+                             4*configMINIMAL_STACK_SIZE,
                              ( void * ) xConnectedSocket,
                              0,
                              NULL );
