@@ -2,8 +2,8 @@
   ******************************************************************************
   * @file    stm32f4xx_hal_dac_ex.c
   * @author  MCD Application Team
-  * @version V1.1.0
-  * @date    19-June-2014
+  * @version V1.4.2
+  * @date    10-November-2015
   * @brief   DAC HAL module driver.
   *         This file provides firmware functions to manage the following 
   *         functionalities of DAC extension peripheral:
@@ -25,7 +25,7 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; COPYRIGHT(c) 2014 STMicroelectronics</center></h2>
+  * <h2><center>&copy; COPYRIGHT(c) 2015 STMicroelectronics</center></h2>
   *
   * Redistribution and use in source and binary forms, with or without modification,
   * are permitted provided that the following conditions are met:
@@ -60,27 +60,29 @@
   * @{
   */
 
-/** @defgroup DACEx 
+/** @defgroup DACEx DACEx
   * @brief DAC driver modules
   * @{
   */ 
 
 #ifdef HAL_DAC_MODULE_ENABLED
 
-#if defined(STM32F405xx) || defined(STM32F415xx) || defined(STM32F407xx) || defined(STM32F417xx) || defined(STM32F427xx) || defined(STM32F437xx) || defined(STM32F429xx) || defined(STM32F439xx)
-
+#if defined(STM32F405xx) || defined(STM32F415xx) || defined(STM32F407xx) || defined(STM32F417xx) ||\
+    defined(STM32F427xx) || defined(STM32F437xx) || defined(STM32F429xx) || defined(STM32F439xx) ||\
+    defined(STM32F410Tx) || defined(STM32F410Cx) || defined(STM32F410Rx) || defined(STM32F446xx) ||\
+    defined(STM32F469xx) || defined(STM32F479xx)
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
-
-/** @defgroup DACEx_Private_Functions
+/* Exported functions --------------------------------------------------------*/
+/** @defgroup DACEx_Exported_Functions DAC Exported Functions
   * @{
   */
 
-/** @defgroup DACEx_Group1 Extended features functions
+/** @defgroup DACEx_Exported_Functions_Group1 Extended features functions
  *  @brief    Extended features functions 
  *
 @verbatim   
@@ -153,7 +155,7 @@ HAL_StatusTypeDef HAL_DACEx_TriangleWaveGenerate(DAC_HandleTypeDef* hdac, uint32
   hdac->State = HAL_DAC_STATE_BUSY;
   
   /* Enable the selected wave generation for the selected DAC channel */
-  hdac->Instance->CR |= (DAC_WAVE_TRIANGLE | Amplitude) << Channel;
+  MODIFY_REG(hdac->Instance->CR, (DAC_CR_WAVE1 | DAC_CR_MAMP1) << Channel, (DAC_CR_WAVE1_1 | Amplitude) << Channel);
   
   /* Change DAC state */
   hdac->State = HAL_DAC_STATE_READY;
@@ -201,7 +203,7 @@ HAL_StatusTypeDef HAL_DACEx_NoiseWaveGenerate(DAC_HandleTypeDef* hdac, uint32_t 
   hdac->State = HAL_DAC_STATE_BUSY;
   
   /* Enable the selected wave generation for the selected DAC channel */
-  hdac->Instance->CR |= (DAC_WAVE_NOISE | Amplitude) << Channel;
+  MODIFY_REG(hdac->Instance->CR, (DAC_CR_WAVE1 | DAC_CR_MAMP1) << Channel, (DAC_CR_WAVE1_0 | Amplitude) << Channel);
   
   /* Change DAC state */
   hdac->State = HAL_DAC_STATE_READY;
@@ -248,7 +250,7 @@ HAL_StatusTypeDef HAL_DACEx_DualSetValue(DAC_HandleTypeDef* hdac, uint32_t Align
   }
   
   tmp = (uint32_t)hdac->Instance;
-  tmp += __HAL_DHR12RD_ALIGNEMENT(Alignment);
+  tmp += DAC_DHR12RD_ALIGNMENT(Alignment);
 
   /* Set the dual DAC selected data holding register */
   *(__IO uint32_t *)tmp = data;
@@ -261,12 +263,6 @@ HAL_StatusTypeDef HAL_DACEx_DualSetValue(DAC_HandleTypeDef* hdac, uint32_t Align
   * @}
   */
 
-// [ILG]
-#if defined ( __GNUC__ )
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-
 /**
   * @brief  Conversion complete callback in non blocking mode for Channel2 
   * @param  hdac: pointer to a DAC_HandleTypeDef structure that contains
@@ -275,6 +271,8 @@ HAL_StatusTypeDef HAL_DACEx_DualSetValue(DAC_HandleTypeDef* hdac, uint32_t Align
   */
 __weak void HAL_DACEx_ConvCpltCallbackCh2(DAC_HandleTypeDef* hdac)
 {
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hdac);
   /* NOTE : This function Should not be modified, when the callback is needed,
             the HAL_DAC_ConvCpltCallback could be implemented in the user file
    */
@@ -288,6 +286,8 @@ __weak void HAL_DACEx_ConvCpltCallbackCh2(DAC_HandleTypeDef* hdac)
   */
 __weak void HAL_DACEx_ConvHalfCpltCallbackCh2(DAC_HandleTypeDef* hdac)
 {
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hdac);
   /* NOTE : This function Should not be modified, when the callback is needed,
             the HAL_DAC_ConvHalfCpltCallbackCh2 could be implemented in the user file
    */
@@ -301,6 +301,8 @@ __weak void HAL_DACEx_ConvHalfCpltCallbackCh2(DAC_HandleTypeDef* hdac)
   */
 __weak void HAL_DACEx_ErrorCallbackCh2(DAC_HandleTypeDef *hdac)
 {
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hdac);
   /* NOTE : This function Should not be modified, when the callback is needed,
             the HAL_DAC_ErrorCallback could be implemented in the user file
    */
@@ -314,15 +316,12 @@ __weak void HAL_DACEx_ErrorCallbackCh2(DAC_HandleTypeDef *hdac)
   */
 __weak void HAL_DACEx_DMAUnderrunCallbackCh2(DAC_HandleTypeDef *hdac)
 {
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hdac);
   /* NOTE : This function Should not be modified, when the callback is needed,
             the HAL_DAC_DMAUnderrunCallbackCh2 could be implemented in the user file
    */
 }
-
-// [ILG]
-#if defined ( __GNUC__ )
-#pragma GCC diagnostic pop
-#endif
 
 /**
   * @brief  DMA conversion complete callback. 
@@ -374,7 +373,9 @@ void DAC_DMAErrorCh2(DMA_HandleTypeDef *hdma)
   * @}
   */
 
-#endif /* STM32F405xx || STM32F415xx || STM32F407xx || STM32F417xx || STM32F427xx || STM32F437xx || STM32F429xx || STM32F439xx */
+#endif /* STM32F405xx || STM32F415xx || STM32F407xx || STM32F417xx ||\
+          STM32F427xx || STM32F437xx || STM32F429xx || STM32F439xx ||\
+          STM32F410xx || STM32F446xx || STM32F469xx || STM32F479xx */
 
 #endif /* HAL_DAC_MODULE_ENABLED */
 

@@ -125,7 +125,7 @@ void init_system_led(void)
 	LED_Config.Pin = GPIO_PIN_12 | GPIO_PIN_13 | GPIO_PIN_14 | GPIO_PIN_15;
 	LED_Config.Mode = GPIO_MODE_OUTPUT_PP;
 	LED_Config.Pull = GPIO_PULLUP;
-	LED_Config.Speed = GPIO_SPEED_FAST;
+	LED_Config.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOD, &LED_Config);
 
 	return;

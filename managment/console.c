@@ -452,7 +452,7 @@ void usart_init(uint32_t baudrate)
 
 	 TX_pin.Pin = GPIO_PIN_6;
 	 TX_pin.Mode = GPIO_MODE_AF_PP;
-	 TX_pin.Speed = GPIO_SPEED_FAST;
+	 TX_pin.Speed = GPIO_SPEED_FREQ_MEDIUM;
 	 TX_pin.Alternate = GPIO_AF8_USART6;
 
 	 HAL_GPIO_Init(GPIOC,&Rx_pin);

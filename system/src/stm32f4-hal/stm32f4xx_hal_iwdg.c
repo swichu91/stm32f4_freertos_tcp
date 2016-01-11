@@ -2,18 +2,18 @@
   ******************************************************************************
   * @file    stm32f4xx_hal_iwdg.c
   * @author  MCD Application Team
-  * @version V1.1.0
-  * @date    19-June-2014
+  * @version V1.4.2
+  * @date    10-November-2015
   * @brief   IWDG HAL module driver.
   *          This file provides firmware functions to manage the following 
   *          functionalities of the Independent Watchdog (IWDG) peripheral:
-  *           + Initialization and de-initialization functions
+  *           + Initialization and Configuration functions
   *           + IO operation functions
   *           + Peripheral State functions
   *         
   @verbatim 
   ==============================================================================
-                    ##### IWDG Generic features #####
+                    ##### IWDG Specific features #####
   ==============================================================================
     [..] 
     (+) The IWDG can be started by either software or hardware (configurable
@@ -76,15 +76,13 @@
        
       (+) __HAL_IWDG_START: Enable the IWDG peripheral
       (+) __HAL_IWDG_RELOAD_COUNTER: Reloads IWDG counter with value defined in the reload register    
-      (+) __HAL_IWDG_ENABLE_WRITE_ACCESS : Enable write access to IWDG_PR and IWDG_RLR registers
-      (+) __HAL_IWDG_DISABLE_WRITE_ACCESS : Disable write access to IWDG_PR and IWDG_RLR registers
       (+) __HAL_IWDG_GET_FLAG: Get the selected IWDG's flag status
 
   @endverbatim
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; COPYRIGHT(c) 2014 STMicroelectronics</center></h2>
+  * <h2><center>&copy; COPYRIGHT(c) 2015 STMicroelectronics</center></h2>
   *
   * Redistribution and use in source and binary forms, with or without modification,
   * are permitted provided that the following conditions are met:
@@ -118,7 +116,7 @@
   * @{
   */
 
-/** @defgroup IWDG 
+/** @defgroup IWDG IWDG
   * @brief IWDG HAL module driver.
   * @{
   */
@@ -127,17 +125,23 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
+ /** @addtogroup IWDG_Private_Constants
+  * @{
+  */
 #define IWDG_TIMEOUT_FLAG          ((uint32_t)1000)     /* 1 s */
+/**
+  * @}
+  */
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
-
-/** @defgroup IWDG_Private_Functions
+/* Exported functions --------------------------------------------------------*/
+/** @defgroup IWDG_Exported_Functions IWDG Exported Functions
   * @{
   */
 
-/** @defgroup IWDG_Group1 Initialization and de-initialization functions 
+/** @defgroup IWDG_Exported_Functions_Group1 Initialization and de-initialization functions 
  *  @brief    Initialization and Configuration functions. 
  *
 @verbatim    
@@ -176,6 +180,8 @@ HAL_StatusTypeDef HAL_IWDG_Init(IWDG_HandleTypeDef *hiwdg)
   
   if(hiwdg->State == HAL_IWDG_STATE_RESET)
   {  
+    /* Allocate lock resource and initialize it */
+    hiwdg->Lock = HAL_UNLOCKED;
     /* Init the low level hardware */
     HAL_IWDG_MspInit(hiwdg);
   }
@@ -184,7 +190,7 @@ HAL_StatusTypeDef HAL_IWDG_Init(IWDG_HandleTypeDef *hiwdg)
   hiwdg->State = HAL_IWDG_STATE_BUSY;  
   
   /* Enable write access to IWDG_PR and IWDG_RLR registers */  
-  __HAL_IWDG_ENABLE_WRITE_ACCESS(hiwdg);
+  IWDG_ENABLE_WRITE_ACCESS(hiwdg);
   
   /* Write to IWDG registers the IWDG_Prescaler & IWDG_Reload values to work with */
   MODIFY_REG(hiwdg->Instance->PR, IWDG_PR_PR, hiwdg->Init.Prescaler);
@@ -197,12 +203,6 @@ HAL_StatusTypeDef HAL_IWDG_Init(IWDG_HandleTypeDef *hiwdg)
   return HAL_OK;
 }
 
-  // [ILG]
-  #if defined ( __GNUC__ )
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wunused-parameter"
-  #endif
-
 /**
   * @brief  Initializes the IWDG MSP.
   * @param  hiwdg: pointer to a IWDG_HandleTypeDef structure that contains
@@ -211,21 +211,18 @@ HAL_StatusTypeDef HAL_IWDG_Init(IWDG_HandleTypeDef *hiwdg)
   */
 __weak void HAL_IWDG_MspInit(IWDG_HandleTypeDef *hiwdg)
 {
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hiwdg);
   /* NOTE : This function Should not be modified, when the callback is needed,
             the HAL_IWDG_MspInit could be implemented in the user file
    */
 }
 
-// [ILG]
-#if defined ( __GNUC__ )
-#pragma GCC diagnostic pop
-#endif
-
 /**
   * @}
   */
 
-/** @defgroup IWDG_Group2 IO operation functions  
+/** @defgroup IWDG_Exported_Functions_Group2 IO operation functions  
  *  @brief   IO operation functions  
  *
 @verbatim   
@@ -320,7 +317,7 @@ HAL_StatusTypeDef HAL_IWDG_Refresh(IWDG_HandleTypeDef *hiwdg)
   * @}
   */
 
-/** @defgroup IWDG_Group3 Peripheral State functions 
+/** @defgroup IWDG_Exported_Functions_Group3 Peripheral State functions 
  *  @brief    Peripheral State functions. 
  *
 @verbatim   

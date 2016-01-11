@@ -102,10 +102,10 @@ void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan)
 	RxCAN_pin.Pull = GPIO_NOPULL;
 	RxCAN_pin.Mode = GPIO_MODE_AF_PP;
 	RxCAN_pin.Alternate = GPIO_AF9_CAN1;
-	RxCAN_pin.Speed = GPIO_SPEED_FAST;
+	RxCAN_pin.Speed = GPIO_SPEED_FREQ_LOW;
 
 	TxCAN_pin.Pin = GPIO_PIN_1;
-	TxCAN_pin.Speed = GPIO_SPEED_FAST;
+	TxCAN_pin.Speed = GPIO_SPEED_FREQ_LOW;
 	TxCAN_pin.Mode = GPIO_MODE_AF_PP;
 	TxCAN_pin.Pull = GPIO_NOPULL;
 	TxCAN_pin.Alternate = GPIO_AF9_CAN1;

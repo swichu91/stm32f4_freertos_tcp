@@ -2,8 +2,8 @@
   ******************************************************************************
   * @file    stm32f4xx_hal_dma2d.c
   * @author  MCD Application Team
-  * @version V1.1.0
-  * @date    19-June-2014
+  * @version V1.4.2
+  * @date    10-November-2015
   * @brief   DMA2D HAL module driver.
   *          This file provides firmware functions to manage the following 
   *          functionalities of the DMA2D peripheral:
@@ -11,11 +11,11 @@
   *           + IO operation functions
   *           + Peripheral Control functions 
   *           + Peripheral State and Errors functions
-  *           
-  @verbatim                 
-  ============================================================================== 
+  *
+  @verbatim 
+  ==============================================================================
                         ##### How to use this driver #####
-  ============================================================================== 
+  ==============================================================================
     [..]
       (#) Program the required configuration through following parameters:   
           the Transfer Mode, the output color mode and the output offset using 
@@ -87,7 +87,7 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; COPYRIGHT(c) 2014 STMicroelectronics</center></h2>
+  * <h2><center>&copy; COPYRIGHT(c) 2015 STMicroelectronics</center></h2>
   *
   * Redistribution and use in source and binary forms, with or without modification,
   * are permitted provided that the following conditions are met:
@@ -120,27 +120,41 @@
 /** @addtogroup STM32F4xx_HAL_Driver
   * @{
   */
-/** @defgroup DMA2D 
+/** @addtogroup DMA2D
   * @brief DMA2D HAL module driver
   * @{
   */
 
 #ifdef HAL_DMA2D_MODULE_ENABLED
 
-#if defined(STM32F427xx) || defined(STM32F437xx) || defined(STM32F429xx) || defined(STM32F439xx)
+#if defined(STM32F427xx) || defined(STM32F437xx) || defined(STM32F429xx) || defined(STM32F439xx) || defined(STM32F469xx) || defined(STM32F479xx)
 
-/* Private typedef -----------------------------------------------------------*/
+/* Private types -------------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
+/** @addtogroup DMA2D_Private_Defines
+  * @{
+  */
 #define HAL_TIMEOUT_DMA2D_ABORT      ((uint32_t)1000)  /* 1s  */
 #define HAL_TIMEOUT_DMA2D_SUSPEND    ((uint32_t)1000)  /* 1s  */
-/* Private macro -------------------------------------------------------------*/
+/**
+  * @}
+  */
+
 /* Private variables ---------------------------------------------------------*/
+/* Private constants ---------------------------------------------------------*/
+/* Private macro -------------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
-static void DMA2D_SetConfig(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_t DstAddress, uint32_t Width, uint32_t Heigh);
+/** @addtogroup DMA2D_Private_Functions_Prototypes
+  * @{
+  */
+static void DMA2D_SetConfig(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_t DstAddress, uint32_t Width, uint32_t Height);
+/**
+  * @}
+  */
 
 /* Private functions ---------------------------------------------------------*/
-
-/** @defgroup DMA2D_Private_Functions
+/* Exported functions --------------------------------------------------------*/
+/** @addtogroup DMA2D_Exported_Functions
   * @{
   */
 
@@ -184,6 +198,8 @@ HAL_StatusTypeDef HAL_DMA2D_Init(DMA2D_HandleTypeDef *hdma2d)
 
   if(hdma2d->State == HAL_DMA2D_STATE_RESET)
   {
+    /* Allocate lock resource and initialize it */
+    hdma2d->Lock = HAL_UNLOCKED;
     /* Init the low level hardware */
     HAL_DMA2D_MspInit(hdma2d);
   }
@@ -270,12 +286,6 @@ HAL_StatusTypeDef HAL_DMA2D_DeInit(DMA2D_HandleTypeDef *hdma2d)
   return HAL_OK;
 }
 
-// [ILG]
-#if defined ( __GNUC__ )
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-
 /**
   * @brief  Initializes the DMA2D MSP.
   * @param  hdma2d: pointer to a DMA2D_HandleTypeDef structure that contains
@@ -284,6 +294,8 @@ HAL_StatusTypeDef HAL_DMA2D_DeInit(DMA2D_HandleTypeDef *hdma2d)
   */
 __weak void HAL_DMA2D_MspInit(DMA2D_HandleTypeDef* hdma2d)
 {
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hdma2d);
   /* NOTE : This function Should not be modified, when the callback is needed,
             the HAL_DMA2D_MspInit could be implemented in the user file
    */ 
@@ -297,15 +309,12 @@ __weak void HAL_DMA2D_MspInit(DMA2D_HandleTypeDef* hdma2d)
   */
 __weak void HAL_DMA2D_MspDeInit(DMA2D_HandleTypeDef* hdma2d)
 {
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hdma2d);
   /* NOTE : This function Should not be modified, when the callback is needed,
             the HAL_DMA2D_MspDeInit could be implemented in the user file
    */ 
 }
-
-// [ILG]
-#if defined ( __GNUC__ )
-#pragma GCC diagnostic pop
-#endif
 
 /**
   * @}
@@ -347,10 +356,10 @@ __weak void HAL_DMA2D_MspDeInit(DMA2D_HandleTypeDef* hdma2d)
   *                     the color value if register to memory DMA2D mode is selected.
   * @param  DstAddress: The destination memory Buffer address.
   * @param  Width:      The width of data to be transferred from source to destination.
-  * @param  Heigh:      The heigh of data to be transferred from source to destination.
+  * @param  Height:      The height of data to be transferred from source to destination.
   * @retval HAL status
   */
-HAL_StatusTypeDef HAL_DMA2D_Start(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_t DstAddress, uint32_t Width,  uint32_t Heigh)
+HAL_StatusTypeDef HAL_DMA2D_Start(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_t DstAddress, uint32_t Width,  uint32_t Height)
 {
   /* Process locked */
   __HAL_LOCK(hdma2d);
@@ -359,14 +368,14 @@ HAL_StatusTypeDef HAL_DMA2D_Start(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, u
   hdma2d->State = HAL_DMA2D_STATE_BUSY;
 
   /* Check the parameters */
-  assert_param(IS_DMA2D_LINE(Heigh));
+  assert_param(IS_DMA2D_LINE(Height));
   assert_param(IS_DMA2D_PIXEL(Width));
 
   /* Disable the Peripheral */
   __HAL_DMA2D_DISABLE(hdma2d);
 
   /* Configure the source, destination address and the data size */
-  DMA2D_SetConfig(hdma2d, pdata, DstAddress, Width, Heigh);
+  DMA2D_SetConfig(hdma2d, pdata, DstAddress, Width, Height);
 
   /* Enable the Peripheral */
   __HAL_DMA2D_ENABLE(hdma2d);
@@ -384,10 +393,10 @@ HAL_StatusTypeDef HAL_DMA2D_Start(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, u
   *                     the color value if register to memory DMA2D mode is selected.
   * @param  DstAddress: The destination memory Buffer address.
   * @param  Width:      The width of data to be transferred from source to destination.
-  * @param  Heigh:      The heigh of data to be transferred from source to destination.
+  * @param  Height:     The height of data to be transferred from source to destination.
   * @retval HAL status
   */
-HAL_StatusTypeDef HAL_DMA2D_Start_IT(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_t DstAddress, uint32_t Width,  uint32_t Heigh)
+HAL_StatusTypeDef HAL_DMA2D_Start_IT(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_t DstAddress, uint32_t Width,  uint32_t Height)
 {
   /* Process locked */
   __HAL_LOCK(hdma2d);
@@ -396,14 +405,14 @@ HAL_StatusTypeDef HAL_DMA2D_Start_IT(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata
   hdma2d->State = HAL_DMA2D_STATE_BUSY;
 
   /* Check the parameters */
-  assert_param(IS_DMA2D_LINE(Heigh));
+  assert_param(IS_DMA2D_LINE(Height));
   assert_param(IS_DMA2D_PIXEL(Width));
 
   /* Disable the Peripheral */
   __HAL_DMA2D_DISABLE(hdma2d);
 
   /* Configure the source, destination address and the data size */
-  DMA2D_SetConfig(hdma2d, pdata, DstAddress, Width, Heigh);
+  DMA2D_SetConfig(hdma2d, pdata, DstAddress, Width, Height);
 
   /* Enable the transfer complete interrupt */
   __HAL_DMA2D_ENABLE_IT(hdma2d, DMA2D_IT_TC);
@@ -428,10 +437,10 @@ HAL_StatusTypeDef HAL_DMA2D_Start_IT(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata
   * @param  SrcAddress2: The source memory Buffer address of the background layer.
   * @param  DstAddress:  The destination memory Buffer address
   * @param  Width:       The width of data to be transferred from source to destination.
-  * @param  Heigh:       The heigh of data to be transferred from source to destination.
+  * @param  Height:      The height of data to be transferred from source to destination.
   * @retval HAL status
   */
-HAL_StatusTypeDef HAL_DMA2D_BlendingStart(DMA2D_HandleTypeDef *hdma2d, uint32_t SrcAddress1, uint32_t  SrcAddress2, uint32_t DstAddress, uint32_t Width,  uint32_t Heigh)
+HAL_StatusTypeDef HAL_DMA2D_BlendingStart(DMA2D_HandleTypeDef *hdma2d, uint32_t SrcAddress1, uint32_t  SrcAddress2, uint32_t DstAddress, uint32_t Width,  uint32_t Height)
 {
   /* Process locked */
   __HAL_LOCK(hdma2d);
@@ -440,7 +449,7 @@ HAL_StatusTypeDef HAL_DMA2D_BlendingStart(DMA2D_HandleTypeDef *hdma2d, uint32_t 
   hdma2d->State = HAL_DMA2D_STATE_BUSY; 
 
   /* Check the parameters */
-  assert_param(IS_DMA2D_LINE(Heigh));
+  assert_param(IS_DMA2D_LINE(Height));
   assert_param(IS_DMA2D_PIXEL(Width));
 
   /* Disable the Peripheral */
@@ -450,7 +459,7 @@ HAL_StatusTypeDef HAL_DMA2D_BlendingStart(DMA2D_HandleTypeDef *hdma2d, uint32_t 
   hdma2d->Instance->BGMAR = SrcAddress2;
 
   /* Configure the source, destination address and the data size */
-  DMA2D_SetConfig(hdma2d, SrcAddress1, DstAddress, Width, Heigh);
+  DMA2D_SetConfig(hdma2d, SrcAddress1, DstAddress, Width, Height);
 
   /* Enable the Peripheral */
   __HAL_DMA2D_ENABLE(hdma2d);
@@ -466,10 +475,10 @@ HAL_StatusTypeDef HAL_DMA2D_BlendingStart(DMA2D_HandleTypeDef *hdma2d, uint32_t 
   * @param  SrcAddress2: The source memory Buffer address of the background layer.
   * @param  DstAddress:  The destination memory Buffer address.
   * @param  Width:       The width of data to be transferred from source to destination.
-  * @param  Heigh:       The heigh of data to be transferred from source to destination.
+  * @param  Height:      The height of data to be transferred from source to destination.
   * @retval HAL status
   */
-HAL_StatusTypeDef HAL_DMA2D_BlendingStart_IT(DMA2D_HandleTypeDef *hdma2d, uint32_t SrcAddress1, uint32_t  SrcAddress2, uint32_t DstAddress, uint32_t Width,  uint32_t Heigh)
+HAL_StatusTypeDef HAL_DMA2D_BlendingStart_IT(DMA2D_HandleTypeDef *hdma2d, uint32_t SrcAddress1, uint32_t  SrcAddress2, uint32_t DstAddress, uint32_t Width,  uint32_t Height)
 {
   /* Process locked */
   __HAL_LOCK(hdma2d);
@@ -478,7 +487,7 @@ HAL_StatusTypeDef HAL_DMA2D_BlendingStart_IT(DMA2D_HandleTypeDef *hdma2d, uint32
   hdma2d->State = HAL_DMA2D_STATE_BUSY;
 
   /* Check the parameters */
-  assert_param(IS_DMA2D_LINE(Heigh));
+  assert_param(IS_DMA2D_LINE(Height));
   assert_param(IS_DMA2D_PIXEL(Width));
 
   /* Disable the Peripheral */
@@ -488,7 +497,7 @@ HAL_StatusTypeDef HAL_DMA2D_BlendingStart_IT(DMA2D_HandleTypeDef *hdma2d, uint32
   hdma2d->Instance->BGMAR = SrcAddress2;
 
   /* Configure the source, destination address and the data size */
-  DMA2D_SetConfig(hdma2d, SrcAddress1, DstAddress, Width, Heigh);
+  DMA2D_SetConfig(hdma2d, SrcAddress1, DstAddress, Width, Height);
 
   /* Enable the configuration error interrupt */
   __HAL_DMA2D_ENABLE_IT(hdma2d, DMA2D_IT_CE);
@@ -890,7 +899,7 @@ HAL_StatusTypeDef HAL_DMA2D_ConfigLayer(DMA2D_HandleTypeDef *hdma2d, uint32_t La
     if ((pLayerCfg->InputColorMode == CM_A4) || (pLayerCfg->InputColorMode == CM_A8))
     {
       /* Prepare the value to be wrote to the BGCOLR register */
-      tmp |= ((pLayerCfg->InputAlpha) & 0x00FFFFFF);
+      tmp = ((pLayerCfg->InputAlpha) & 0x00FFFFFF);
     
       /* Write to DMA2D BGCOLR register */
       hdma2d->Instance->BGCOLR = tmp;
@@ -936,7 +945,7 @@ HAL_StatusTypeDef HAL_DMA2D_ConfigLayer(DMA2D_HandleTypeDef *hdma2d, uint32_t La
     if ((pLayerCfg->InputColorMode == CM_A4) || (pLayerCfg->InputColorMode == CM_A8))
     {
       /* Prepare the value to be wrote to the FGCOLR register */
-      tmp |= ((pLayerCfg->InputAlpha) & 0x00FFFFFF);
+      tmp = ((pLayerCfg->InputAlpha) & 0x00FFFFFF);
     
       /* Write to DMA2D FGCOLR register */
       hdma2d->Instance->FGCOLR = tmp;
@@ -1176,10 +1185,10 @@ uint32_t HAL_DMA2D_GetError(DMA2D_HandleTypeDef *hdma2d)
   * @param  pdata:      The source memory Buffer address
   * @param  DstAddress: The destination memory Buffer address
   * @param  Width:      The width of data to be transferred from source to destination.
-  * @param  Heigh:      The heigh of data to be transferred from source to destination.
+  * @param  Height:     The height of data to be transferred from source to destination.
   * @retval HAL status
   */
-static void DMA2D_SetConfig(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_t DstAddress, uint32_t Width, uint32_t Heigh)
+static void DMA2D_SetConfig(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_t DstAddress, uint32_t Width, uint32_t Height)
 {  
   uint32_t tmp = 0;
   uint32_t tmp1 = 0;
@@ -1190,7 +1199,7 @@ static void DMA2D_SetConfig(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_
   tmp = Width << 16;
   
   /* Configure DMA2D data size */
-  hdma2d->Instance->NLR = (Heigh | tmp);
+  hdma2d->Instance->NLR = (Height | tmp);
   
   /* Configure DMA2D destination address */
   hdma2d->Instance->OMAR = DstAddress;
@@ -1248,7 +1257,7 @@ static void DMA2D_SetConfig(DMA2D_HandleTypeDef *hdma2d, uint32_t pdata, uint32_
 /**
   * @}
   */
-#endif /* STM32F427xx || STM32F437xx || STM32F429xx || STM32F439xx */
+#endif /* STM32F427xx || STM32F437xx || STM32F429xx || STM32F439xx || STM32F469xx || STM32F479xx */
 #endif /* HAL_DMA2D_MODULE_ENABLED */
 /**
   * @}
