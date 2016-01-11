@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+FAT Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+FAT Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include James Walmsley, Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -23,16 +23,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+FAT is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+FAT is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+FAT can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+FAT is
+ * executed, as follows:
+ *
+ * If FreeRTOS+FAT is executed on one of the processors listed under the Special
+ * License Arrangements heading of the FreeRTOS+FAT license information web
+ * page, then it can be used under the terms of the FreeRTOS Open Source
+ * License.  If FreeRTOS+FAT is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ *
+ * The FreeRTOS+FAT License Information Page: http://www.FreeRTOS.org/fat_license
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+FAT is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+FAT unless you agree that you use the software 'as is'.
@@ -398,7 +402,7 @@ FF_IOManager_t *pxIOManager = pxDisk->pxIOManager;
 			/* OFS_FSI_32_Reserved1		0x004 / 480 times 0 */
 			FF_putLong( pucSectorBuffer, OFS_FSI_32_StrucSig, 0x61417272 ); /* Another signature that is more localized in the */
 																	 /* sector to the location of the fields that are used. */
-			FF_putLong( pucSectorBuffer, OFS_FSI_32_Free_Count, ~0U );      /* last known free cluster count on the volume, ~0 for unknown */
+			FF_putLong( pucSectorBuffer, OFS_FSI_32_Free_Count, ulUsableDataClusters );      /* last known free cluster count on the volume, ~0 for unknown */
 			FF_putLong( pucSectorBuffer, OFS_FSI_32_Nxt_Free, 2 );          /* cluster number at which the driver should start looking for free clusters */
 			/* OFS_FSI_32_Reserved2		0x1F0 / zero's */
 			FF_putLong( pucSectorBuffer, OFS_FSI_32_TrailSig, 0xAA550000 ); /* Will correct for endianness */
@@ -498,7 +502,7 @@ FF_Error_t FF_Partition( FF_Disk_t *pxDisk, FF_PartitionParameters_t *pParams )
 {
 	const uint32_t ulInterSpace = pParams->ulInterSpace ? pParams->ulInterSpace : 2048;  /* Hidden space between 2 extended partitions */
 	BaseType_t xPartitionNumber;
-	FF_Part_t pxPartitions[ffconfigMAX_PARTITIONS];
+	FF_Part_t pxPartitions[ ffconfigMAX_PARTITIONS ];
 	uint32_t ulPartitionOffset; /* Pointer within partition table */
 	FF_Buffer_t *pxSectorBuffer;
 	uint8_t *pucBuffer;
@@ -587,7 +591,6 @@ FF_Error_t FF_Partition( FF_Disk_t *pxDisk, FF_PartitionParameters_t *pParams )
 	}
 
 	{
-	BaseType_t xPartitionNumber;
 	uint32_t ulRemaining = ulAvailable;
 	uint32_t ulLBA = pParams->ulHiddenSectors;
 
@@ -647,7 +650,6 @@ FF_Error_t FF_Partition( FF_Disk_t *pxDisk, FF_PartitionParameters_t *pParams )
 			/* we're at secor 0: */
 			/* write primary partitions, if any */
 			/* create big extended partition */
-			BaseType_t xPartitionNumber;
 			uint32_t ulStartLBA = pParams->ulHiddenSectors;
 				for( xPartitionNumber = 0; xPartitionNumber < pParams->xPrimaryCount; xPartitionNumber++ )
 				{
@@ -694,16 +696,16 @@ FF_Error_t FF_Partition( FF_Disk_t *pxDisk, FF_PartitionParameters_t *pParams )
 			memcpy ( pucBuffer + OFS_BPB_jmpBoot_24, "\xEB\x00\x90" "FreeRTOS", 11 );   /* Includes OFS_BPB_OEMName_64 */
 
 			ulPartitionOffset = OFS_PTABLE_PART_0;
-			for( xPartitionNumber = 0; xPartitionNumber < 4; xPartitionNumber++, ulPartitionOffset += 16 )
+			for( xPartitionNumber = 0; xPartitionNumber < ffconfigMAX_PARTITIONS; xPartitionNumber++, ulPartitionOffset += 16 )
 			{
-				FF_putChar( pucBuffer, ulPartitionOffset + OFS_PART_ACTIVE_8,            writeParts[ xPartitionNumber ].ucActive );         /* 0x01BE 0x80 if active */
-				FF_putChar( pucBuffer, ulPartitionOffset + OFS_PART_START_HEAD_8,        1 );         /* 0x001 / 0x01BF */
-				FF_putShort(pucBuffer, ulPartitionOffset + OFS_PART_START_SEC_TRACK_16,  1 );  /* 0x002 / 0x01C0 */
-				FF_putChar( pucBuffer, ulPartitionOffset + OFS_PART_ID_NUMBER_8,         writeParts[ xPartitionNumber ].ucPartitionID );       /* 0x004 / 0x01C2 */
-				FF_putChar( pucBuffer, ulPartitionOffset + OFS_PART_ENDING_HEAD_8,       0xFE );     /* 0x005 / 0x01C3 */
-				FF_putShort(pucBuffer, ulPartitionOffset + OFS_PART_ENDING_SEC_TRACK_16, writeParts[ xPartitionNumber ].ulSectorCount );   /* 0x006 / 0x01C4 */
-				FF_putLong (pucBuffer, ulPartitionOffset + OFS_PART_STARTING_LBA_32,     writeParts[ xPartitionNumber ].ulStartLBA );  /* 0x008 / 0x01C6 This is important */
-				FF_putLong (pucBuffer, ulPartitionOffset + OFS_PART_LENGTH_32,           writeParts[ xPartitionNumber ].ulSectorCount );  /* 0x00C / 0x01CA Equal to total sectors */
+				FF_putChar( pucBuffer, ulPartitionOffset + OFS_PART_ACTIVE_8,            writeParts[ xPartitionNumber ].ucActive );		/* 0x01BE 0x80 if active */
+				FF_putChar( pucBuffer, ulPartitionOffset + OFS_PART_START_HEAD_8,        1 );											/* 0x001 / 0x01BF */
+				FF_putShort(pucBuffer, ulPartitionOffset + OFS_PART_START_SEC_TRACK_16,  1 );											/* 0x002 / 0x01C0 */
+				FF_putChar( pucBuffer, ulPartitionOffset + OFS_PART_ID_NUMBER_8,         writeParts[ xPartitionNumber ].ucPartitionID );/* 0x004 / 0x01C2 */
+				FF_putChar( pucBuffer, ulPartitionOffset + OFS_PART_ENDING_HEAD_8,       0xFE );										/* 0x005 / 0x01C3 */
+				FF_putShort(pucBuffer, ulPartitionOffset + OFS_PART_ENDING_SEC_TRACK_16, writeParts[ xPartitionNumber ].ulSectorCount );/* 0x006 / 0x01C4 */
+				FF_putLong (pucBuffer, ulPartitionOffset + OFS_PART_STARTING_LBA_32,     writeParts[ xPartitionNumber ].ulStartLBA );	/* 0x008 / 0x01C6 This is important */
+				FF_putLong (pucBuffer, ulPartitionOffset + OFS_PART_LENGTH_32,           writeParts[ xPartitionNumber ].ulSectorCount );/* 0x00C / 0x01CA Equal to total sectors */
 			}
 			pucBuffer[510] = 0x55;
 			pucBuffer[511] = 0xAA;
@@ -728,16 +730,16 @@ FF_Error_t FF_Partition( FF_Disk_t *pxDisk, FF_PartitionParameters_t *pParams )
 		memcpy (pucBuffer + OFS_BPB_jmpBoot_24, "\xEB\x00\x90" "FreeRTOS", 11 );   /* Includes OFS_BPB_OEMName_64 */
 		ulPartitionOffset = OFS_PTABLE_PART_0;
 
-		for( xPartitionNumber = 0; xPartitionNumber < 4; xPartitionNumber++ )
+		for( xPartitionNumber = 0; xPartitionNumber < ffconfigMAX_PARTITIONS; xPartitionNumber++ )
 		{
-			FF_putChar(  pucBuffer, ulPartitionOffset + OFS_PART_ACTIVE_8,            pxPartitions[ xPartitionNumber ].ucActive );         /* 0x01BE 0x80 if active */
-			FF_putChar(  pucBuffer, ulPartitionOffset + OFS_PART_START_HEAD_8,        1 );         /* 0x001 / 0x01BF */
-			FF_putShort( pucBuffer, ulPartitionOffset + OFS_PART_START_SEC_TRACK_16,  1 );  /* 0x002 / 0x01C0 */
-			FF_putChar(  pucBuffer, ulPartitionOffset + OFS_PART_ID_NUMBER_8,         pxPartitions[ xPartitionNumber ].ucPartitionID );       /* 0x004 / 0x01C2 */
-			FF_putChar(  pucBuffer, ulPartitionOffset + OFS_PART_ENDING_HEAD_8,       0xFE );     /* 0x005 / 0x01C3 */
-			FF_putShort( pucBuffer, ulPartitionOffset + OFS_PART_ENDING_SEC_TRACK_16, pxPartitions[ xPartitionNumber ].ulSectorCount );   /* 0x006 / 0x01C4 */
-			FF_putLong(  pucBuffer, ulPartitionOffset + OFS_PART_STARTING_LBA_32,     pxPartitions[ xPartitionNumber ].ulStartLBA );  /* 0x008 / 0x01C6 This is important */
-			FF_putLong(  pucBuffer, ulPartitionOffset + OFS_PART_LENGTH_32,           pxPartitions[ xPartitionNumber ].ulSectorCount );  /* 0x00C / 0x01CA Equal to total sectors */
+			FF_putChar(  pucBuffer, ulPartitionOffset + OFS_PART_ACTIVE_8,            pxPartitions[ xPartitionNumber ].ucActive );		/* 0x01BE 0x80 if active */
+			FF_putChar(  pucBuffer, ulPartitionOffset + OFS_PART_START_HEAD_8,        1 );         										/* 0x001 / 0x01BF */
+			FF_putShort( pucBuffer, ulPartitionOffset + OFS_PART_START_SEC_TRACK_16,  1 );  											/* 0x002 / 0x01C0 */
+			FF_putChar(  pucBuffer, ulPartitionOffset + OFS_PART_ID_NUMBER_8,         pxPartitions[ xPartitionNumber ].ucPartitionID );	/* 0x004 / 0x01C2 */
+			FF_putChar(  pucBuffer, ulPartitionOffset + OFS_PART_ENDING_HEAD_8,       0xFE );     										/* 0x005 / 0x01C3 */
+			FF_putShort( pucBuffer, ulPartitionOffset + OFS_PART_ENDING_SEC_TRACK_16, pxPartitions[ xPartitionNumber ].ulSectorCount );	/* 0x006 / 0x01C4 */
+			FF_putLong(  pucBuffer, ulPartitionOffset + OFS_PART_STARTING_LBA_32,     pxPartitions[ xPartitionNumber ].ulStartLBA );	/* 0x008 / 0x01C6 This is important */
+			FF_putLong(  pucBuffer, ulPartitionOffset + OFS_PART_LENGTH_32,           pxPartitions[ xPartitionNumber ].ulSectorCount );	/* 0x00C / 0x01CA Equal to total sectors */
 			ulPartitionOffset += 16;
 		}
 		pucBuffer[ 510 ] = 0x55;

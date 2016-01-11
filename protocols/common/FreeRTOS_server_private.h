@@ -1,18 +1,20 @@
 /*
- * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  ***                                                                         ***
  ***                                                                         ***
- ***   FREERTOS+TCP IS STILL IN THE LAB:                                     ***
+ ***   FREERTOS+TCP IS STILL IN THE LAB (mainly because the FTP and HTTP     ***
+ ***   demos have a dependency on FreeRTOS+FAT, which is only in the Labs    ***
+ ***   download):                                                            ***
  ***                                                                         ***
- ***   This product is functional and is already being used in commercial    ***
- ***   products.  Be aware however that we are still refining its design,    ***
- ***   the source code does not yet fully conform to the strict coding and   ***
- ***   style standards mandated by Real Time Engineers ltd., and the         ***
- ***   documentation and testing is not necessarily complete.                ***
+ ***   FreeRTOS+TCP is functional and has been used in commercial products   ***
+ ***   for some time.  Be aware however that we are still refining its       ***
+ ***   design, the source code does not yet quite conform to the strict      ***
+ ***   coding and style standards mandated by Real Time Engineers ltd., and  ***
+ ***   the documentation and testing is not necessarily complete.            ***
  ***                                                                         ***
  ***   PLEASE REPORT EXPERIENCES USING THE SUPPORT RESOURCES FOUND ON THE    ***
  ***   URL: http://www.FreeRTOS.org/contact  Active early adopters may, at   ***
@@ -23,16 +25,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+TCP is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+TCP is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+TCP can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+TCP is
+ * executed, as follows:
+ *
+ * If FreeRTOS+TCP is executed on one of the processors listed under the Special 
+ * License Arrangements heading of the FreeRTOS+TCP license information web 
+ * page, then it can be used under the terms of the FreeRTOS Open Source 
+ * License.  If FreeRTOS+TCP is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ * 
+ * The FreeRTOS+TCP License Information Page: http://www.FreeRTOS.org/tcp_license 
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+TCP is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+TCP unless you agree that you use the software 'as is'.
@@ -63,13 +69,25 @@
 #include "server_config.h"
 #include "FreeRTOS_TCP_server.h"
 
-
-
 /* Each HTTP server has 1, at most 2 sockets */
 #define	HTTP_SOCKET_COUNT	2
 
-#ifndef HTTP_COMMAND_BUFFER_SIZE
-	#define HTTP_COMMAND_BUFFER_SIZE	( 2048 )
+/*
+ * ipconfigTCP_COMMAND_BUFFER_SIZE sets the size of:
+ *     pcCommandBuffer': a buffer to receive and send TCP commands
+ *
+ * ipconfigTCP_FILE_BUFFER_SIZE sets the size of:
+ *     pcFileBuffer'   : a buffer to access the file system: read or write data.
+ *
+ * The buffers are both used for FTP as well as HTTP.
+ */
+
+#ifndef ipconfigTCP_COMMAND_BUFFER_SIZE
+	#define ipconfigTCP_COMMAND_BUFFER_SIZE	( 2048 )
+#endif
+
+#ifndef ipconfigTCP_FILE_BUFFER_SIZE
+	#define ipconfigTCP_FILE_BUFFER_SIZE	( 2048 )
 #endif
 
 struct xTCP_CLIENT;
@@ -174,8 +192,11 @@ BaseType_t xMakeAbsolute( struct xFTP_CLIENT *pxClient, char *pcBuffer, BaseType
 struct xTCP_SERVER
 {
 	SocketSet_t xSocketSet;
-	char pcCommandBuffer[ HTTP_COMMAND_BUFFER_SIZE ];
-	char pcFileBuffer[ HTTP_COMMAND_BUFFER_SIZE ];
+	/* A buffer to receive and send TCP commands, either HTTP of FTP. */
+	char pcCommandBuffer[ ipconfigTCP_COMMAND_BUFFER_SIZE ];
+	/* A buffer to access the file system: read or write data. */
+	char pcFileBuffer[ ipconfigTCP_FILE_BUFFER_SIZE ];
+
 	#if( ipconfigUSE_FTP != 0 )
 		char pcNewDir[ ffconfigMAX_FILENAME ];
 	#endif

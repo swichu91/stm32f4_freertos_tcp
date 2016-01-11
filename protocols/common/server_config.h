@@ -9,7 +9,7 @@
 #define SERVER_CONFIG_H_
 
 /* Include HTTP. */
-#define ipconfigUSE_FTP  0
+#define ipconfigUSE_FTP  1
 #define ipconfigUSE_HTTP 1
 #define ipconfigUSE_SNTP 1
 

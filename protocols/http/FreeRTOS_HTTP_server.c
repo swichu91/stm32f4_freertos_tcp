@@ -1,18 +1,20 @@
 /*
- * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  ***                                                                         ***
  ***                                                                         ***
- ***   FREERTOS+TCP IS STILL IN THE LAB:                                     ***
+ ***   FREERTOS+TCP IS STILL IN THE LAB (mainly because the FTP and HTTP     ***
+ ***   demos have a dependency on FreeRTOS+FAT, which is only in the Labs    ***
+ ***   download):                                                            ***
  ***                                                                         ***
- ***   This product is functional and is already being used in commercial    ***
- ***   products.  Be aware however that we are still refining its design,    ***
- ***   the source code does not yet fully conform to the strict coding and   ***
- ***   style standards mandated by Real Time Engineers ltd., and the         ***
- ***   documentation and testing is not necessarily complete.                ***
+ ***   FreeRTOS+TCP is functional and has been used in commercial products   ***
+ ***   for some time.  Be aware however that we are still refining its       ***
+ ***   design, the source code does not yet quite conform to the strict      ***
+ ***   coding and style standards mandated by Real Time Engineers ltd., and  ***
+ ***   the documentation and testing is not necessarily complete.            ***
  ***                                                                         ***
  ***   PLEASE REPORT EXPERIENCES USING THE SUPPORT RESOURCES FOUND ON THE    ***
  ***   URL: http://www.FreeRTOS.org/contact  Active early adopters may, at   ***
@@ -23,16 +25,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+TCP is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+TCP is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+TCP can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+TCP is
+ * executed, as follows:
+ *
+ * If FreeRTOS+TCP is executed on one of the processors listed under the Special 
+ * License Arrangements heading of the FreeRTOS+TCP license information web 
+ * page, then it can be used under the terms of the FreeRTOS Open Source 
+ * License.  If FreeRTOS+TCP is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ * 
+ * The FreeRTOS+TCP License Information Page: http://www.FreeRTOS.org/tcp_license 
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+TCP is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+TCP unless you agree that you use the software 'as is'.
@@ -52,7 +58,6 @@
 /* Standard includes. */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
@@ -106,8 +111,6 @@ static BaseType_t prvSendReply( xHTTPClient *pxClient, BaseType_t xCode );
 
 static const char pcEmptyString[1] = { '\0' };
 
-
-
 void vHTTPClientDelete( xTCPClient *pxTCPClient )
 {
 xHTTPClient *pxClient = ( xHTTPClient * ) pxTCPClient;
@@ -142,7 +145,7 @@ BaseType_t xRc;
 	// A normal command reply on the main socket (port 21)
 	char *pcBuffer = pxParent->pcFileBuffer;
 
-	xRc = snprintf( pcBuffer, HTTP_COMMAND_BUFFER_SIZE,
+	xRc = snprintf( pcBuffer, sizeof( pxParent->pcFileBuffer ),
 		"HTTP/1.1 %d %s\r\n"
 #if	USE_HTML_CHUNKS
 		"Transfer-Encoding: chunked\r\n"
@@ -214,7 +217,14 @@ BaseType_t xRc = 0;
 
 	if( pxClient->xBytesLeft <= 0 )
 	{
+		/* Writing is ready, no need for further 'eSELECT_WRITE' events. */
+		FreeRTOS_FD_CLR( pxClient->xSocket, pxClient->pxParent->xSocketSet, eSELECT_WRITE );
 		prvFileClose( pxClient );
+	}
+	else
+	{
+		/* Wake up the TCP task as soon as this socket may be written to. */
+		FreeRTOS_FD_SET( pxClient->xSocket, pxClient->pxParent->xSocketSet, eSELECT_WRITE );
 	}
 
 	return xRc;
@@ -313,7 +323,7 @@ xHTTPClient *pxClient = ( xHTTPClient * ) pxTCPClient;
 	const struct xWEB_COMMAND *curCmd;
 	char *pcBuffer = pcCOMMAND_BUFFER;
 
-		if( xRc < ( BaseType_t )HTTP_COMMAND_BUFFER_SIZE )
+		if( xRc < ( BaseType_t ) sizeof( pcCOMMAND_BUFFER ) )
 		{
 			pcBuffer[ xRc ] = '\0';
 		}

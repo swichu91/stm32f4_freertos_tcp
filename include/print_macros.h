@@ -19,7 +19,7 @@ char print_buffer[512];
 
 //wyswietlanie aktualnej daty
 #define PRINT_SYSTIME	do{	print_console("Current time:\n");	\
-					sprintf(print_buffer,"%d.%02d.%02d\n%02d:%02d:%02d\n",sys_time.year,sys_time.month,sys_time.day,sys_time.hour,sys_time.min,sys_time.sec);	\
+					sprintf(print_buffer,"%d-%02d-%02d\n%02d:%02d:%02d\n",sys_time.year,sys_time.month,sys_time.day,sys_time.hour,sys_time.min,sys_time.sec);	\
 					print_console(print_buffer);	\
 					print_console("\n");	\
 }while(0)

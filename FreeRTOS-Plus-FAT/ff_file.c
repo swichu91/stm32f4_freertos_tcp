@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+FAT Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+FAT Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include James Walmsley, Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -23,16 +23,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+FAT is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+FAT is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+FAT can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+FAT is
+ * executed, as follows:
+ *
+ * If FreeRTOS+FAT is executed on one of the processors listed under the Special
+ * License Arrangements heading of the FreeRTOS+FAT license information web
+ * page, then it can be used under the terms of the FreeRTOS Open Source
+ * License.  If FreeRTOS+FAT is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ *
+ * The FreeRTOS+FAT License Information Page: http://www.FreeRTOS.org/fat_license
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+FAT is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+FAT unless you agree that you use the software 'as is'.
@@ -84,40 +88,41 @@ static uint32_t FF_FileLBA( FF_FILE *pxFile );
  *
  *	@return	Returns the mode bits that should be passed to the FF_Open function.
  **/
-uint8_t FF_GetModeBits( const char *Mode )
+uint8_t FF_GetModeBits( const char *pcMode )
 {
-	uint8_t ModeBits = 0x00;
-	while( *Mode != '\0' )
+uint8_t ucModeBits = 0x00;
+
+	while( *pcMode != '\0' )
 	{
-		switch( *Mode )
+		switch( *pcMode )
 		{
 			case 'r':						/* Allow Read. */
 			case 'R':
-				ModeBits |= FF_MODE_READ;
+				ucModeBits |= FF_MODE_READ;
 				break;
 
 			case 'w':						/* Allow Write. */
 			case 'W':
-				ModeBits |= FF_MODE_WRITE;
-				ModeBits |= FF_MODE_CREATE; /* Create if not exist. */
-				ModeBits |= FF_MODE_TRUNCATE;
+				ucModeBits |= FF_MODE_WRITE;
+				ucModeBits |= FF_MODE_CREATE; /* Create if not exist. */
+				ucModeBits |= FF_MODE_TRUNCATE;
 				break;
 
 			case 'a':						/* Append new writes to the end of the file. */
 			case 'A':
-				ModeBits |= FF_MODE_WRITE;
-				ModeBits |= FF_MODE_APPEND;
-				ModeBits |= FF_MODE_CREATE; /* Create if not exist. */
+				ucModeBits |= FF_MODE_WRITE;
+				ucModeBits |= FF_MODE_APPEND;
+				ucModeBits |= FF_MODE_CREATE; /* Create if not exist. */
 				break;
 
 			case '+':						/* Update the file, don't Append! */
-				ModeBits |= FF_MODE_READ;
-				ModeBits |= FF_MODE_WRITE;	/* RW Mode. */
+				ucModeBits |= FF_MODE_READ;
+				ucModeBits |= FF_MODE_WRITE;	/* RW Mode. */
 				break;
 
 			case 'D':
 				/* Internal use only! */
-				ModeBits |= FF_MODE_DIR;
+				ucModeBits |= FF_MODE_DIR;
 				break;
 
 			case 'b':
@@ -129,10 +134,10 @@ uint8_t FF_GetModeBits( const char *Mode )
 				break;
 		}
 
-		Mode++;
+		pcMode++;
 	}
 
-	return ModeBits;
+	return ucModeBits;
 }	/* FF_GetModeBits() */
 /*-----------------------------------------------------------*/
 
@@ -298,7 +303,10 @@ FF_FindParams_t xFindParams;
 		xFindParams.ulDirCluster = FF_FindDir( pxIOManager, pcPath, xIndex, &xError );
 		if( xFindParams.ulDirCluster == 0ul )
 		{
-			FF_PRINTF( "FF_Open[%s]: Path not found\n", pcPath );
+			if( ( ucMode & FF_MODE_WRITE ) != 0 )
+			{
+				FF_PRINTF( "FF_Open[%s]: Path not found\n", pcPath );
+			}
 			/* The user tries to open a file but the path leading to the file does not exist. */
 		}
 		else if( FF_isERR( xError ) == pdFALSE )
@@ -386,15 +394,6 @@ FF_FindParams_t xFindParams;
 		pxFile->ulEndOfChain = 0;
 		pxFile->ulValidFlags &= ~( FF_VALID_FLAG_DELETED );
 
-		/* File Permission Processing
-		Only "w" and "w+" mode strings can erase a file's contents.
-		Any other combinations will not cause an erase. */
-		if( ( ucMode & FF_MODE_TRUNCATE ) != 0 )
-		{
-			pxFile->ulFileSize = 0;
-			pxFile->ulFilePointer = 0;
-		}
-
 		/* Add pxFile onto the end of our linked list of FF_FILE objects.
 		But first make sure that there are not 2 handles with write access
 		to the same object. */
@@ -435,6 +434,17 @@ FF_FindParams_t xFindParams;
 		}
 
 		FF_ReleaseSemaphore( pxIOManager->pvSemaphore );
+	}
+
+	if( FF_isERR( xError ) == pdFALSE )
+	{
+		/* If the file is opened with the truncate flag, truncate its contents. */
+		if( ( ucMode & FF_MODE_TRUNCATE ) != 0 )
+		{
+			/* Set the current size and position to zero. */
+			pxFile->ulFileSize = 0;
+			pxFile->ulFilePointer = 0;
+		}
 	}
 
 	if( FF_isERR( xError ) != pdFALSE )
@@ -1026,7 +1036,7 @@ BaseType_t FF_isEOF( FF_FILE *pxFile )
 {
 BaseType_t xReturn;
 
-	if( ( pxFile == NULL ) && ( pxFile->ulFilePointer >= pxFile->ulFileSize ) )
+	if( ( pxFile != NULL ) && ( pxFile->ulFilePointer >= pxFile->ulFileSize ) )
 	{
 		xReturn = pdTRUE;
 	}
@@ -1260,7 +1270,7 @@ FF_FATBuffers_t xFATBuffers;
 		}
 	}
 
-	if( FF_isERR( xError ) == pdFALSE )
+	if( ( FF_isERR( xError ) == pdFALSE ) && ( ulTotalClustersNeeded > pxFile->ulChainLength ) )
 	{
 	uint32_t ulCurrentCluster, ulNextCluster;
 
@@ -3009,53 +3019,50 @@ uint32_t ulClustersNeeded;
 	/* First change the FAT chain. */
 	if( ( FF_isERR( xError ) == pdFALSE ) && ( ulClusterCount > ulClustersNeeded ) )
 	{
-		FF_PRINTF( "Unlinking the extra cluster (got %lu needed %lu)\n", ulClusterCount, ulClustersNeeded );
+		if( ulClustersNeeded == 0ul )
 		{
-			if( ulClustersNeeded == 0ul )
+			FF_LockFAT( pxIOManager );
 			{
-				FF_LockFAT( pxIOManager );
-				{
-					/* In FF_Truncate() */
-					xError = FF_UnlinkClusterChain( pxIOManager, pxFile->ulObjectCluster, 0 );
-				}
-				FF_UnlockFAT( pxIOManager );
+				/* In FF_Truncate() */
+				xError = FF_UnlinkClusterChain( pxIOManager, pxFile->ulObjectCluster, 0 );
+			}
+			FF_UnlockFAT( pxIOManager );
+
+			if( FF_isERR( xError ) == pdFALSE )
+			{
+			FF_DirEnt_t xOriginalEntry;
+
+				/* The directory denotes the address of the first data cluster of every file.
+				Now change it to 'ulAddrCurrentCluster': */
+				xError = FF_GetEntry( pxIOManager, pxFile->usDirEntry, pxFile->ulDirCluster, &xOriginalEntry );
 
 				if( FF_isERR( xError ) == pdFALSE )
 				{
-				FF_DirEnt_t xOriginalEntry;
-
-					/* The directory denotes the address of the first data cluster of every file.
-					Now change it to 'ulAddrCurrentCluster': */
-					xError = FF_GetEntry( pxIOManager, pxFile->usDirEntry, pxFile->ulDirCluster, &xOriginalEntry );
+					xOriginalEntry.ulObjectCluster = 0ul;
+					xError = FF_PutEntry( pxIOManager, pxFile->usDirEntry, pxFile->ulDirCluster, &xOriginalEntry, NULL );
 
 					if( FF_isERR( xError ) == pdFALSE )
 					{
-						xOriginalEntry.ulObjectCluster = 0ul;
-						xError = FF_PutEntry( pxIOManager, pxFile->usDirEntry, pxFile->ulDirCluster, &xOriginalEntry, NULL );
-
-						if( FF_isERR( xError ) == pdFALSE )
-						{
-							pxFile->ulObjectCluster = 0ul;
-							pxFile->ulChainLength = 0ul;
-							pxFile->ulCurrentCluster = 0ul;
-							pxFile->ulEndOfChain = 0ul;
-						}
+						pxFile->ulObjectCluster = 0ul;
+						pxFile->ulChainLength = 0ul;
+						pxFile->ulCurrentCluster = 0ul;
+						pxFile->ulEndOfChain = 0ul;
 					}
 				}
 			}
-			else
+		}
+		else
+		{
+			FF_LockFAT( pxIOManager );
 			{
-				FF_LockFAT( pxIOManager );
-				{
-					uint32_t ulTruncateCluster = FF_TraverseFAT( pxIOManager, pxFile->ulObjectCluster, ulClustersNeeded - 1, &xError );
+				uint32_t ulTruncateCluster = FF_TraverseFAT( pxIOManager, pxFile->ulObjectCluster, ulClustersNeeded - 1, &xError );
 
-					if( FF_isERR( xError ) == pdFALSE )
-					{
-						xError = FF_UnlinkClusterChain( pxIOManager, ulTruncateCluster, 1 );
-					}
+				if( FF_isERR( xError ) == pdFALSE )
+				{
+					xError = FF_UnlinkClusterChain( pxIOManager, ulTruncateCluster, 1 );
 				}
-				FF_UnlockFAT( pxIOManager );
 			}
+			FF_UnlockFAT( pxIOManager );
 		}
 	}
 

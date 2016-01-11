@@ -222,7 +222,7 @@ TaskHandle_t xServerWorkTaskHandle = NULL;
 
 	static void prvServerWorkTask( void *pvParameters )
 	{
-	xTCPServer *pxTCPServer = NULL;
+	TCPServer_t *pxTCPServer = NULL;
 	const TickType_t xInitialBlockTime = pdMS_TO_TICKS( 200UL );
 
 	/* A structure that defines the servers to be created.  Which servers are

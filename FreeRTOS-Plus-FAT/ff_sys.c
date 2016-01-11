@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+FAT Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+FAT Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include James Walmsley, Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -23,16 +23,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+FAT is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+FAT is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+FAT can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+FAT is
+ * executed, as follows:
+ *
+ * If FreeRTOS+FAT is executed on one of the processors listed under the Special
+ * License Arrangements heading of the FreeRTOS+FAT license information web
+ * page, then it can be used under the terms of the FreeRTOS Open Source
+ * License.  If FreeRTOS+FAT is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ *
+ * The FreeRTOS+FAT License Information Page: http://www.FreeRTOS.org/fat_license
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+FAT is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+FAT unless you agree that you use the software 'as is'.
@@ -136,7 +140,7 @@ int FF_FS_Add( const char *pcPath, FF_Disk_t *pxDisk )
 				}
 			}
 		}
-		if( index < 0 && file_systems.fsCount >= ARRAY_SIZE( file_systems.systems ) )
+		if( ( index < 0 ) && ( file_systems.fsCount >= ARRAY_SIZE( file_systems.systems ) ) )
 		{
 			FF_PRINTF( "FF_FS_Add: Table full '%s' (max = %d)\n", pcPath, (int)ARRAY_SIZE( file_systems.systems ) );
 		}
@@ -198,7 +202,7 @@ int i;
 }
 /*-----------------------------------------------------------*/
 
-int FF_FS_Find( const char *apContext, const char *pcPath, FF_DirHandler_t *pxHandler )
+int FF_FS_Find( const char *pcPath, FF_DirHandler_t *pxHandler )
 {
 FF_SubSystem_t *pxSubSystem;
 int len;
@@ -241,8 +245,6 @@ int iReturn;
 	}
 	else
 	{
-		if( apContext )
-			FF_PRINTF( "%s: No handler for \"%s\"\n", apContext, pcPath );
 		iReturn = pdFALSE;
 	}
 

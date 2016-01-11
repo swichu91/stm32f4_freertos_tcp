@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+FAT Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+FAT Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include James Walmsley, Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -23,16 +23,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+FAT is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+FAT is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+FAT can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+FAT is
+ * executed, as follows:
+ *
+ * If FreeRTOS+FAT is executed on one of the processors listed under the Special
+ * License Arrangements heading of the FreeRTOS+FAT license information web
+ * page, then it can be used under the terms of the FreeRTOS Open Source
+ * License.  If FreeRTOS+FAT is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ *
+ * The FreeRTOS+FAT License Information Page: http://www.FreeRTOS.org/fat_license
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+FAT is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+FAT unless you agree that you use the software 'as is'.
@@ -129,6 +133,16 @@ in a call to ff_truncate(). */
 
 #endif /* ffconfigHAS_CWD */
 
+
+#if( ffconfigUSE_DELTREE != 0 )
+	/*
+	 * Remove all files and directories starting from a certain path.
+	 * This function uses recursion - which breaches the coding standard.  USE
+	 * WITH CARE. 
+	 */
+	static int ff_deltree_recurse( char *pcPath );
+#endif
+
 /*
  * Translate a +FAT error to a value compatible with errno.h
  * If the value represents an error, it is negative
@@ -156,7 +170,7 @@ uint8_t ucMode;
 	pcFile = prvABSPath( pcFile );
 
 	/* Look-up the I/O manager for the file system. */
-	if( FF_FS_Find( "ff_fopen", pcFile, &xHandler ) == pdFALSE )
+	if( FF_FS_Find( pcFile, &xHandler ) == pdFALSE )
 	{
 		stdioSET_ERRNO( pdFREERTOS_ERRNO_ENXIO );	/* No such device or address. */
 	}
@@ -682,7 +696,7 @@ char *pcBufferToWrite;
 		pcDirectory = prvABSPath( pcDirectory );
 
 		/* Find the i/o manager for this path */
-		if( FF_FS_Find( "ff_mkdir", pcDirectory, &xHandler ) == pdFALSE )
+		if( FF_FS_Find( pcDirectory, &xHandler ) == pdFALSE )
 		{
 			/* No such device or address. */
 			stdioSET_ERRNO( pdFREERTOS_ERRNO_ENXIO );
@@ -732,7 +746,7 @@ char *pcBufferToWrite;
 		pcDirectory = prvABSPath( pcDirectory );
 
 		/* Find the i/o manager for this path */
-		if( FF_FS_Find( "ff_mkdir", pcDirectory, &xHandler ) == pdFALSE )
+		if( FF_FS_Find( pcDirectory, &xHandler ) == pdFALSE )
 		{
 			/* No such device or address.  Store the errno to thread local
 			storage. */
@@ -816,7 +830,7 @@ FF_DirHandler_t xHandler;
 	pcDirectory = prvABSPath( pcDirectory );
 
 	/* Find the i/o manager which can handle this path. */
-	if( FF_FS_Find( "ff_rmdir", pcDirectory, &xHandler ) == pdFALSE )
+	if( FF_FS_Find( pcDirectory, &xHandler ) == pdFALSE )
 	{
 		ff_errno = pdFREERTOS_ERRNO_ENXIO;	/* No such device or address */
 
@@ -856,7 +870,7 @@ int iReturn, ff_errno;
 	pcPath = prvABSPath( pcPath );
 
 	/* Find the i/o manager which can handle this path. */
-	if( FF_FS_Find( "ff_remove", pcPath, &xHandler ) == pdFALSE )
+	if( FF_FS_Find( pcPath, &xHandler ) == pdFALSE )
 	{
 		/* No such device or address */
 		ff_errno = pdFREERTOS_ERRNO_ENXIO;
@@ -909,7 +923,7 @@ int ff_errno = 0, iReturn;
 	pcOldName = prvABSPath( pcOldName );
 
 	/* Find the i/o manager which can handle this path */
-	if( FF_FS_Find( "ff_rename_1", pcOldName, &xHandlers[ 0 ] ) == pdFALSE )
+	if( FF_FS_Find( pcOldName, &xHandlers[ 0 ] ) == pdFALSE )
 	{
 		xError = ( int32_t ) ( FF_ERR_NULL_POINTER | FF_MOVE );
 		ff_errno = pdFREERTOS_ERRNO_ENXIO;	/* No such device or address */
@@ -945,7 +959,7 @@ int ff_errno = 0, iReturn;
 			pcNewName = prvABSPath( pcNewName );
 
 			/* Find the i/o manager which can handle this path */
-			if( FF_FS_Find( "ff_rename_2", pcNewName, &( xHandlers[ 1 ] ) ) == pdFALSE )
+			if( FF_FS_Find( pcNewName, &( xHandlers[ 1 ] ) ) == pdFALSE )
 			{
 				xError = ( int32_t ) ( FF_ERR_NULL_POINTER | FF_MOVE );
 				ff_errno = pdFREERTOS_ERRNO_ENXIO;	/* No such device or address */
@@ -1020,7 +1034,7 @@ FF_FindParams_t xFindParams;
 	pcName = prvABSPath( pcName );
 
 	/* Look-up the I/O manager for the file system. */
-	if( FF_FS_Find( "ff_new_stat", pcName, &xHandler ) == pdFALSE )
+	if( FF_FS_Find( pcName, &xHandler ) == pdFALSE )
 	{
 		/* No such device or address. */
 		xError = ( FF_Error_t ) ( pdFREERTOS_ERRNO_ENXIO | FF_STAT_FUNC );
@@ -1277,12 +1291,11 @@ const char *pcDirectory;
 	}
 
 		/* Find the i/o manager that can handle this path. */
-	if( FF_FS_Find( "ff_findfirst", pcDirectory, &( pxFindData->xDirectoryHandler ) ) == pdFALSE )
+	if( FF_FS_Find( pcDirectory, &( pxFindData->xDirectoryHandler ) ) == pdFALSE )
 	{
 		if( ( iIsRootDir == pdFALSE ) || ( FF_FS_Count() == 0 ) )
 		{
-			FF_PRINTF( "ff_findfirst: No handler found for path \"%s\"\n", pcDirectory );
-			stdioSET_ERRNO( prvFFErrorToErrno( FF_ERR_NULL_POINTER | FF_FINDFIRST ) );
+			stdioSET_ERRNO( prvFFErrorToErrno( ( FF_Error_t ) ( FF_ERR_NULL_POINTER | FF_FINDFIRST ) ) );
 			iReturn = -1;
 		}
 	}
@@ -1488,7 +1501,7 @@ FF_Error_t xError;
 		pxFindData->ulFileSize = pxFindData->xDirectoryEntry.ulFileSize;
 	}
 
-	stdioSET_ERRNO( xError );
+	stdioSET_ERRNO( prvFFErrorToErrno( xError ) );
 
 	return xError;
 }
@@ -1505,7 +1518,7 @@ int ff_isdirempty(const char *pcPath )
 	/* In case a CWD is used, get the absolute path */
 	pcPath = prvABSPath( pcPath );
 	/* Find the i/o manager which can handle this path */
-	if( FF_FS_Find( "ff_isdirempty", pcPath, &xHandler ) == pdFALSE )
+	if( FF_FS_Find( pcPath, &xHandler ) == pdFALSE )
 	{
 		iResult = ( int ) ( FF_ERR_NULL_POINTER | FF_ISDIREMPTY );
 	}
@@ -1536,7 +1549,7 @@ FF_Error_t xError;
 	int32_t lReturn;
 #endif
 
-	if( FF_FS_Find( "ff_diskfree", pcPath, &xHandler ) == pdFALSE )
+	if( FF_FS_Find( pcPath, &xHandler ) == pdFALSE )
 	{
 		/* Return cluster 0 for error. */
 		lReturn = 0ul;
@@ -1567,7 +1580,7 @@ int iResult;
 FF_DirHandler_t xHandler;
 FF_Error_t errCode;
 
-	if( FF_FS_Find( "ff_finddir", pcPath, &xHandler ) == pdFALSE )
+	if( FF_FS_Find( pcPath, &xHandler ) == pdFALSE )
 	{
 		/* Return cluster 0 for error. */
 		iResult = 0;
@@ -1594,14 +1607,6 @@ FF_Error_t xReturned;
 		xReturn = 0;
 		stdioSET_ERRNO( prvFFErrorToErrno( xReturned ) );
 	}
-#if 0
-	_RB_ The below test is invalid as an int32_t cannot be greater than or equal to SIZE_MAX
-	else if( xReturned >= SIZE_MAX )
-	{
-		stdioSET_ERRNO( pdFREERTOS_ERRNO_ESPIPE );
-		xReturn = 0;
-	}
-#endif
 	else
 	{
 		/* No errors. */
@@ -1612,16 +1617,158 @@ FF_Error_t xReturned;
 }
 /*-----------------------------------------------------------*/
 
+/*-----------------------------------------------------------
+ * Delete a directory and, recursively, all of its contents
+ *-----------------------------------------------------------*/
+#if( ffconfigUSE_DELTREE != 0 )
+	int ff_deltree( const char *pcDirectory )
+	{
+	int iResult;
+	char *pcPath;
+
+		pcPath = ( char * ) ffconfigMALLOC( ffconfigMAX_FILENAME );
+		if( pcPath != NULL )
+		{
+			/* In case a CWD is used, get the absolute path */
+			pcDirectory = prvABSPath( pcDirectory );
+			snprintf (pcPath, ffconfigMAX_FILENAME, "%s", pcDirectory);
+			/* This recursive function will do all the work */
+			iResult = ff_deltree_recurse (pcPath);
+			if( iResult >= 0 )
+			{
+				iResult = ff_rmdir( pcPath );
+				if( iResult )
+				{
+					FF_PRINTF("ff_deltree(%s): %s\n", pcPath, strerror( stdioGET_ERRNO( ) ) );
+				}
+			}
+			ffconfigFREE( pcPath );
+		}
+		else
+		{
+			iResult = -1;
+			stdioSET_ERRNO( pdFREERTOS_ERRNO_ENOMEM );
+		}
+		return iResult;
+	}
+#endif /* ffconfigUSE_DELTREE */
+/*-----------------------------------------------------------*/
+
+#if( ffconfigUSE_DELTREE != 0 )
+	static int ff_deltree_recurse( char *pcPath )
+	{
+	FF_FindData_t *pxFindData;
+	BaseType_t xIsDir, xIsDotDir;
+	FF_Error_t xError;
+	int iResult, iNameLength, pass, iCount = 0;
+
+		pxFindData = ( FF_FindData_t * ) ffconfigMALLOC( sizeof( *pxFindData ) );
+		if( pxFindData != NULL )
+		{
+			iNameLength = ( int ) strlen( pcPath );
+			/* The directory will be scanned 2 times.  First the sub-directories will be
+			entered and their contents deleted.  In the second pass the files in the
+			current directory will be removed.  In this way 'pcPath' can be constantly
+			used and reused recursively which is cheaper than allocating 'ffconfigMAX_FILENAME'
+			bytes within each recursion. */
+			for( pass = 0; pass < 2; pass++ )
+			{
+				for( iResult = ff_findfirst( pcPath, pxFindData );
+					 iResult == 0;
+					 iResult = ff_findnext( pxFindData ) )
+				{
+					xIsDir = ( pxFindData->xDirectoryEntry.ucAttrib & FF_FAT_ATTR_DIR ) != 0;
+					if( ( pass == 0 ) && ( xIsDir != pdFALSE ) )
+					{
+					/* This entry is a directory.  Don't traverse '.' or '..' */
+					xIsDotDir = 0;
+
+						if( pxFindData->pcFileName[ 0 ] == '.' )
+						{
+							if( ( pxFindData->pcFileName[ 1 ] == '.' ) &&
+								( pxFindData->pcFileName[ 2 ] == '\0' ) )
+							{
+								xIsDotDir = 2;
+							}
+							else if( pxFindData->pcFileName[ 1 ] == '\0' )
+							{
+								xIsDotDir = 1;
+							}
+						}
+						if( xIsDotDir == 0 )
+						{
+							snprintf( pcPath + iNameLength, ( size_t ) ( ffconfigMAX_FILENAME - iNameLength ) , "%s%s",
+								pcPath[ iNameLength - 1 ] == '/' ? "" : "/", pxFindData->pcFileName );
+							/* Remove the contents of this directory. */
+							iResult = ff_deltree_recurse( pcPath );
+							if( iResult < 0 )
+							{
+								iCount = -1;
+								break;
+							}
+							iCount += iResult;
+							/* remove the directory itself */
+							xError = ff_rmdir( pcPath );
+							if( xError != 0 )
+							{
+								FF_PRINTF( "ff_rmdir( %s ): errno %d\n", pcPath, stdioGET_ERRNO() );
+							}
+							else
+							{
+								iCount++;
+							}
+						}
+					}
+					else if( ( pass == 1 ) && ( xIsDir == pdFALSE ) )
+					{
+						snprintf( pcPath + iNameLength, ( size_t ) ( ffconfigMAX_FILENAME - iNameLength ), "%s%s",
+							pcPath[ iNameLength - 1 ] == '/' ? "" : "/", pxFindData->pcFileName );
+						/* Remove a plain file. */
+						xError = ff_remove( pcPath );
+						if( xError != 0 )
+						{
+							FF_PRINTF( "ff_remove( %s ): errno %d\n", pcPath, stdioGET_ERRNO() );
+						}
+						else
+						{
+							iCount++;
+						}
+					}
+					pcPath[ iNameLength ] = '\0';
+				}
+
+				if( FF_GETERROR( iResult ) == FF_ERR_DIR_INVALID_PATH )
+				{
+					break;
+				}
+				if( ( FF_GETERROR( iResult ) != FF_ERR_DIR_END_OF_DIR ) && ( FF_GETERROR( iResult ) != FF_ERR_FILE_INVALID_PATH ) )
+				{
+					FF_PRINTF( "ff_deltree_recurse[%s]: %s\n", pcPath, ( const char * ) FF_GetErrMessage( iResult ) );
+				}
+			}
+			ffconfigFREE( pxFindData );
+		}
+		else
+		{
+			iCount = -1;
+			stdioSET_ERRNO( pdFREERTOS_ERRNO_ENOMEM );
+		}
+
+		return iCount;
+	}
+#endif /* ffconfigUSE_DELTREE */
+/*-----------------------------------------------------------*/
+
 static int prvFFErrorToErrno( FF_Error_t xError )
 {
 	if( FF_isERR( xError ) == pdFALSE )
 	{
 		return 0;
 	}
-	
+
 	/* Store the last +FAT error code received. */
 	stdioSET_FF_ERROR( xError );
-	
+
 	switch( FF_GETERROR( xError ) )
 	{
 	/* Global Error Codes. */

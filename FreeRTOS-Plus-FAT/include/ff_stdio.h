@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+FAT Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+FAT Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include James Walmsley, Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -23,16 +23,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+FAT is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+FAT is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+FAT can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+FAT is
+ * executed, as follows:
+ *
+ * If FreeRTOS+FAT is executed on one of the processors listed under the Special
+ * License Arrangements heading of the FreeRTOS+FAT license information web
+ * page, then it can be used under the terms of the FreeRTOS Open Source
+ * License.  If FreeRTOS+FAT is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ *
+ * The FreeRTOS+FAT License Information Page: http://www.FreeRTOS.org/fat_license
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+FAT is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+FAT unless you agree that you use the software 'as is'.
@@ -96,6 +100,14 @@ extern "C" {
 #define FF_FA_DIREC		0x10
 #define FF_FA_ARCH		0x20
 
+/* FreeRTOS+FAT uses three thread local buffers.  The first stores errno, the
+second a pointer to the CWD structure (if one is used), and the third the more
+descriptive error code. */
+#define stdioERRNO_THREAD_LOCAL_OFFSET 		( ffconfigCWD_THREAD_LOCAL_INDEX + 0 )
+#define stdioCWD_THREAD_LOCAL_OFFSET		( ffconfigCWD_THREAD_LOCAL_INDEX + 1 )
+#define stdioFF_ERROR_THREAD_LOCAL_OFFSET	( ffconfigCWD_THREAD_LOCAL_INDEX + 2 )
+
+
 /* Structure used with ff_stat(). */
 typedef struct FF_STAT
 {
@@ -150,18 +162,15 @@ static portINLINE void stdioSET_ERRNO( int iErrno )
 
 static portINLINE int stdioGET_ERRNO( void )
 {
-	return ( int ) pvTaskGetThreadLocalStoragePointer( NULL, ffconfigCWD_THREAD_LOCAL_INDEX );
+void *pvResult;
+
+	pvResult = pvTaskGetThreadLocalStoragePointer( NULL, ffconfigCWD_THREAD_LOCAL_INDEX );
+	return ( int ) pvResult;
 }
 
 #if( ( configNUM_THREAD_LOCAL_STORAGE_POINTERS - ffconfigCWD_THREAD_LOCAL_INDEX ) < 3 )
 	#error Please define space for 3 entries
 #endif
-
-/* FreeRTOS+FAT uses two thread local buffers.  The first stores errno, the
-second a pointer to the CWD structure (if one is used). */
-#define stdioERRNO_THREAD_LOCAL_OFFSET 		( ffconfigCWD_THREAD_LOCAL_INDEX + 0 )
-#define stdioCWD_THREAD_LOCAL_OFFSET		( ffconfigCWD_THREAD_LOCAL_INDEX + 1 )
-#define stdioFF_ERROR_THREAD_LOCAL_OFFSET	( ffconfigCWD_THREAD_LOCAL_INDEX + 2 )
 
 /*
  * Store the FreeRTOS+FAT error code, which provides more detail than errno.
@@ -172,12 +181,15 @@ static portINLINE void stdioSET_FF_ERROR( FF_Error_t iFF_ERROR )
 }
 
 /*
- * Read back the FreeRTOS+FAT error code, which provides more detail than 
+ * Read back the FreeRTOS+FAT error code, which provides more detail than
  * errno.
  */
 static portINLINE FF_Error_t stdioGET_FF_ERROR( void )
 {
-	return ( FF_Error_t ) pvTaskGetThreadLocalStoragePointer( NULL, stdioFF_ERROR_THREAD_LOCAL_OFFSET );
+void *pvResult;
+
+	pvResult = pvTaskGetThreadLocalStoragePointer( NULL, stdioFF_ERROR_THREAD_LOCAL_OFFSET );
+	return ( FF_Error_t ) pvResult;
 }
 
 /*-----------------------------------------------------------
@@ -207,7 +219,17 @@ int ff_feof( FF_FILE *pxStream );
  *-----------------------------------------------------------*/
 size_t ff_fread( void *pvBuffer, size_t xSize, size_t xItems, FF_FILE * pxStream );
 size_t ff_fwrite( const void *pvBuffer, size_t xSize, size_t xItems, FF_FILE * pxStream );
-int ff_fprintf( FF_FILE * pxStream, const char *pcFormat, ... );
+
+/* Whenever possible, use ellipsis parameter type checking.
+_RB_ Compiler specifics need to be moved to the compiler specific header files. */
+#if defined(__GNUC__)
+	/* The GNU-C compiler will check if the parameters are correct. */
+	int ff_fprintf( FF_FILE * pxStream, const char *pcFormat, ... )
+		__attribute__ ( ( format ( __printf__, 2, 3 ) ) );
+#else
+	int ff_fprintf( FF_FILE * pxStream, const char *pcFormat, ... );
+#endif
+
 int ff_fgetc( FF_FILE * pxStream);
 int ff_fputc( int iChar, FF_FILE *pxStream );
 char *ff_fgets( char *pcBuffer, size_t xCount, FF_FILE *pxStream );
@@ -272,7 +294,17 @@ int ff_rmdir( const char *pcDirectory );
  * The most up to date API documentation is currently provided on the following URL:
  * http://www.freertos.org/FreeRTOS-Plus/FreeRTOS_Plus_FAT/Standard_File_System_API.html
  *-----------------------------------------------------------*/
-int ff_deltree( const char *pcPath );
+#if( ffconfigUSE_DELTREE != 0 )
+	/* By default, this function will not be compiled.  The function will
+	recursively call itself, which is against the FreeRTOS coding standards, so
+	IT MUST BE USED WITH CARE.
+
+	The cost of each recursion will be roughly:
+		Stack : 48 (12 stack words)
+		Heap  : 112 + ffconfigMAX_FILENAME
+	These numbers may change depending on CPU and compiler. */
+	int ff_deltree( const char *pcPath );
+#endif
 
 /*-----------------------------------------------------------
  * Remove/delete a file.

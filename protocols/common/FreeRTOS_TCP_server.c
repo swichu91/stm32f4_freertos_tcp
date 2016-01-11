@@ -1,18 +1,20 @@
 /*
- * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  ***                                                                         ***
  ***                                                                         ***
- ***   FREERTOS+TCP IS STILL IN THE LAB:                                     ***
+ ***   FREERTOS+TCP IS STILL IN THE LAB (mainly because the FTP and HTTP     ***
+ ***   demos have a dependency on FreeRTOS+FAT, which is only in the Labs    ***
+ ***   download):                                                            ***
  ***                                                                         ***
- ***   This product is functional and is already being used in commercial    ***
- ***   products.  Be aware however that we are still refining its design,    ***
- ***   the source code does not yet fully conform to the strict coding and   ***
- ***   style standards mandated by Real Time Engineers ltd., and the         ***
- ***   documentation and testing is not necessarily complete.                ***
+ ***   FreeRTOS+TCP is functional and has been used in commercial products   ***
+ ***   for some time.  Be aware however that we are still refining its       ***
+ ***   design, the source code does not yet quite conform to the strict      ***
+ ***   coding and style standards mandated by Real Time Engineers ltd., and  ***
+ ***   the documentation and testing is not necessarily complete.            ***
  ***                                                                         ***
  ***   PLEASE REPORT EXPERIENCES USING THE SUPPORT RESOURCES FOUND ON THE    ***
  ***   URL: http://www.FreeRTOS.org/contact  Active early adopters may, at   ***
@@ -23,16 +25,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+TCP is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+TCP is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+TCP can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+TCP is
+ * executed, as follows:
+ *
+ * If FreeRTOS+TCP is executed on one of the processors listed under the Special 
+ * License Arrangements heading of the FreeRTOS+TCP license information web 
+ * page, then it can be used under the terms of the FreeRTOS Open Source 
+ * License.  If FreeRTOS+TCP is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ * 
+ * The FreeRTOS+TCP License Information Page: http://www.FreeRTOS.org/tcp_license 
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+TCP is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+TCP unless you agree that you use the software 'as is'.
@@ -71,13 +77,13 @@
 #endif
 
 
-static void prvReceiveNewClient( xTCPServer *pxServer, BaseType_t xIndex, Socket_t xNexSocket );
+static void prvReceiveNewClient( TCPServer_t *pxServer, BaseType_t xIndex, Socket_t xNexSocket );
 static char *strnew( const char *pcString );
 static void prvRemoveSlash( char *pcDir );
 
-xTCPServer *FreeRTOS_CreateTCPServer( const struct xSERVER_CONFIG *pxConfigs, BaseType_t xCount )
+TCPServer_t *FreeRTOS_CreateTCPServer( const struct xSERVER_CONFIG *pxConfigs, BaseType_t xCount )
 {
-xTCPServer *pxServer;
+TCPServer_t *pxServer;
 SocketSet_t xSocketSet;
 
 	/* Create a new server.
@@ -90,7 +96,7 @@ SocketSet_t xSocketSet;
 
 		xSize = sizeof( *pxServer ) - sizeof( pxServer->xServers ) + xCount * sizeof( pxServer->xServers[ 0 ] );
 
-		pxServer = ( xTCPServer * ) pvPortMallocLarge( xSize );
+		pxServer = ( TCPServer_t * ) pvPortMallocLarge( xSize );
 		if( pxServer != NULL )
 		{
 		struct freertos_sockaddr xAddress;
@@ -168,7 +174,7 @@ SocketSet_t xSocketSet;
 }
 /*-----------------------------------------------------------*/
 
-static void prvReceiveNewClient( xTCPServer *pxServer, BaseType_t xIndex, Socket_t xNexSocket )
+static void prvReceiveNewClient( TCPServer_t *pxServer, BaseType_t xIndex, Socket_t xNexSocket )
 {
 xTCPClient *pxClient = NULL;
 BaseType_t xSize = 0;
@@ -236,9 +242,9 @@ const char *pcType = "Unknown";
 	/* Remove compiler warnings in case FreeRTOS_printf() is not used. */
 	( void ) pcType;
 }
+/*-----------------------------------------------------------*/
 
-
-void FreeRTOS_TCPServerWork( xTCPServer *pxServer, TickType_t xBlockingTime )
+void FreeRTOS_TCPServerWork( TCPServer_t *pxServer, TickType_t xBlockingTime )
 {
 xTCPClient **ppxClient;
 BaseType_t xIndex;
@@ -274,7 +280,6 @@ BaseType_t xRc;
 
 	while( ( * ppxClient ) != NULL )
 	{
-	BaseType_t xRc = 0;
 	xTCPClient *pxThis = *ppxClient;
 
 		/* Almost C++ */
@@ -310,6 +315,7 @@ char *pxBuffer;
 
 	return pxBuffer;
 }
+/*-----------------------------------------------------------*/
 
 static void prvRemoveSlash( char *pcDir )
 {
@@ -320,4 +326,53 @@ BaseType_t xLength = strlen( pcDir );
 		pcDir[ --xLength ] = '\0';
 	}
 }
+/*-----------------------------------------------------------*/
 
+#if( ipconfigSUPPORT_SIGNALS != 0 )
+
+	/* FreeRTOS_TCPServerWork() calls select().
+	The two functions below provide a possibility to interrupt
+	the call to select(). After the interruption, resume
+	by calling FreeRTOS_TCPServerWork() again. */
+	BaseType_t FreeRTOS_TCPServerSignal( TCPServer_t *pxServer )
+	{
+	BaseType_t xIndex;
+	BaseType_t xResult = pdFALSE;
+		for( xIndex = 0; xIndex < pxServer->xServerCount; xIndex++ )
+		{
+			if( pxServer->xServers[ xIndex ].xSocket != FREERTOS_NO_SOCKET )
+			{
+				FreeRTOS_SignalSocket( pxServer->xServers[ xIndex ].xSocket );
+				xResult = pdTRUE;
+				break;
+			}
+		}
+
+		return xResult;
+	}
+
+#endif /* ipconfigSUPPORT_SIGNALS */
+/*-----------------------------------------------------------*/
+
+#if( ipconfigSUPPORT_SIGNALS != 0 )
+
+	/* Same as above: this function may be called from an ISR,
+	for instance a GPIO interrupt. */
+	BaseType_t FreeRTOS_TCPServerSignalFromISR( TCPServer_t *pxServer, BaseType_t *pxHigherPriorityTaskWoken )
+	{
+	BaseType_t xIndex;
+	BaseType_t xResult = pdFALSE;
+		for( xIndex = 0; xIndex < pxServer->xServerCount; xIndex++ )
+		{
+			if( pxServer->xServers[ xIndex ].xSocket != FREERTOS_NO_SOCKET )
+			{
+				FreeRTOS_SignalSocketFromISR( pxServer->xServers[ xIndex ].xSocket, pxHigherPriorityTaskWoken );
+				xResult = pdTRUE;
+				break;
+			}
+		}
+
+		return xResult;
+	}
+#endif /* ipconfigSUPPORT_SIGNALS */
+/*-----------------------------------------------------------*/

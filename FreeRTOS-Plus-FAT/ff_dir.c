@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+FAT Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+FAT Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include James Walmsley, Hein Tibosch and Richard Barry
  *
  *******************************************************************************
@@ -23,16 +23,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+FAT is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+FAT is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+FAT can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+FAT is
+ * executed, as follows:
+ *
+ * If FreeRTOS+FAT is executed on one of the processors listed under the Special
+ * License Arrangements heading of the FreeRTOS+FAT license information web
+ * page, then it can be used under the terms of the FreeRTOS Open Source
+ * License.  If FreeRTOS+FAT is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ *
+ * The FreeRTOS+FAT License Information Page: http://www.FreeRTOS.org/fat_license
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+FAT is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+FAT unless you agree that you use the software 'as is'.
@@ -1755,15 +1759,25 @@ const uint8_t *pucEntryBuffer = NULL;
 								{
 									break;
 								}
+
+								/* 'usCurrentItem' has already incremented by FF_PopulateLongDirent(),
+								this loop will incremente it again. */
 								pxDirEntry->usCurrentItem -= 1;
+
+								/* xFetchContext/usCurrentItem have changed.  Update
+								'pucEntryBuffer' to point to the current buffer position. */
+								pucEntryBuffer = pxDirEntry->xFetchContext.pxBuffer->pucBuffer +
+									( FF_SIZEOF_DIRECTORY_ENTRY * ( pxDirEntry->usCurrentItem % ( FF_SIZEOF_SECTOR/FF_SIZEOF_DIRECTORY_ENTRY ) ) );
 							}
 							else
 							{
 								break;
 							}
 						}
-						#else
+						#else	/* ffconfigFINDAPI_ALLOW_WILDCARDS == 0 */
 						{
+							/* usCurrentItem has been incremented by FF_PopulateLongDirent().
+							Entry will be returned. */
 							break;
 						}
 						#endif
@@ -1771,6 +1785,8 @@ const uint8_t *pucEntryBuffer = NULL;
 				}
 				#else /* ffconfigLFN_SUPPORT */
 				{
+					/* Increment 'usCurrentItem' with (xLFNCount-1),
+					the loop will do an extra increment. */
 					pxDirEntry->usCurrentItem += ( xLFNCount - 1 );
 				}
 				#endif /* ffconfigLFN_SUPPORT */
@@ -2151,14 +2167,23 @@ uint16_t NameLen;
 			pxFindParams->pcEntryBuffer[ xIndex++ ] = ch;
 		}
 	}
+	
+	if( ( xLastDot == 0 ) && ( xIndex < 6 ) )
+	{
+		/* This is a file name like ".info" or ".root" */
+		pxFindParams->ucFirstTilde = xIndex;
+	}
+	
 	while ( xIndex < 11 )
 	{
 		pxFindParams->pcEntryBuffer[ xIndex++ ] = 0x20;
 	}
+	
 	if( ( xLastDot < pxFindParams->ucFirstTilde ) && ( xLastDot > 0 ) )
 	{
 		pxFindParams->ucFirstTilde = xLastDot;
 	}
+	
 	if( NameLen < pxFindParams->ucFirstTilde )	/* Names like "Abc" will become "~Abc". */
 	{
 		pxFindParams->ucFirstTilde = ( uint8_t ) NameLen;
@@ -2242,7 +2267,7 @@ uint32_t ulCluster;
 				{
 					/* In the first round, check if the original name can be used
 					Makefile will be stored as "makefile" and not as "makefi~1". */
-		
+
 					/* This method saves a lot of time when creating directories with
 					many similar file names: when the short name version of a LFN already
 					exists, try at most 3 entries with a tilde:
@@ -2601,7 +2626,7 @@ FF_FATBuffers_t xFATBuffers;
 						FF_InitFATBuffers ( &xFATBuffers, FF_MODE_WRITE );
 						/* xNextCluster already has been set to 0xFFFFFFFF,
 						now let xCurrentCluster point to xNextCluster. */
-						
+
 						xError = FF_putFATEntry( pxIOManager, xCurrentCluster, xNextCluster, &xFATBuffers );
 						{
 						FF_Error_t xTempError;
@@ -3077,9 +3102,12 @@ FF_FindParams_t xFindParams;
 			break;
 		}
 
+		/* Write 8.3 entry "." */
 		pucEntryBuffer[ 0 ] = '.';
+		/* folowed by 10 spaces: */
 		memset( pucEntryBuffer + 1, ' ', 10 );
-		memset( pucEntryBuffer + 11, 0, 21 );
+		/* Clear the rest of the structure. */
+		memset( pucEntryBuffer + 11, 0, FF_SIZEOF_DIRECTORY_ENTRY - 11 );
 
 		ulObjectCluster = xMyDirectory.ulObjectCluster;
 		xError = FF_PutEntry( pxIOManager, ( uint16_t ) 0u, ulObjectCluster, &xMyDirectory, pucEntryBuffer );
@@ -3286,7 +3314,6 @@ uint8_t	pucEntryBuffer[ FF_SIZEOF_DIRECTORY_ENTRY ];
 				break;
 			}
 		}
-		FF_PRINTF( "FF_UnHashDir %lu %s\n", ulDirCluster, pxHash < pxLast ? "OK" : "not found" );
 	}	/* FF_UnHashDir() */
 #endif /* ffconfigHASH_CACHE */
 /*-----------------------------------------------------------*/

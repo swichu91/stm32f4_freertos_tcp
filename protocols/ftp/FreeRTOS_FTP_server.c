@@ -1,18 +1,20 @@
 /*
- * FreeRTOS+TCP Labs Build 150825 (C) 2015 Real Time Engineers ltd.
+ * FreeRTOS+TCP Labs Build 160111 (C) 2016 Real Time Engineers ltd.
  * Authors include Hein Tibosch and Richard Barry
  *
  *******************************************************************************
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  ***                                                                         ***
  ***                                                                         ***
- ***   FREERTOS+TCP IS STILL IN THE LAB:                                     ***
+ ***   FREERTOS+TCP IS STILL IN THE LAB (mainly because the FTP and HTTP     ***
+ ***   demos have a dependency on FreeRTOS+FAT, which is only in the Labs    ***
+ ***   download):                                                            ***
  ***                                                                         ***
- ***   This product is functional and is already being used in commercial    ***
- ***   products.  Be aware however that we are still refining its design,    ***
- ***   the source code does not yet fully conform to the strict coding and   ***
- ***   style standards mandated by Real Time Engineers ltd., and the         ***
- ***   documentation and testing is not necessarily complete.                ***
+ ***   FreeRTOS+TCP is functional and has been used in commercial products   ***
+ ***   for some time.  Be aware however that we are still refining its       ***
+ ***   design, the source code does not yet quite conform to the strict      ***
+ ***   coding and style standards mandated by Real Time Engineers ltd., and  ***
+ ***   the documentation and testing is not necessarily complete.            ***
  ***                                                                         ***
  ***   PLEASE REPORT EXPERIENCES USING THE SUPPORT RESOURCES FOUND ON THE    ***
  ***   URL: http://www.FreeRTOS.org/contact  Active early adopters may, at   ***
@@ -23,16 +25,20 @@
  ***** NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ******* NOTE ***
  *******************************************************************************
  *
- * - Open source licensing -
- * While FreeRTOS+TCP is in the lab it is provided only under version two of the
- * GNU General Public License (GPL) (which is different to the standard FreeRTOS
- * license).  FreeRTOS+TCP is free to download, use and distribute under the
- * terms of that license provided the copyright notice and this text are not
- * altered or removed from the source files.  The GPL V2 text is available on
- * the gnu.org web site, and on the following
- * URL: http://www.FreeRTOS.org/gpl-2.0.txt.  Active early adopters may, and
- * solely at the discretion of Real Time Engineers Ltd., be offered versions
- * under a license other then the GPL.
+ * FreeRTOS+TCP can be used under two different free open source licenses.  The
+ * license that applies is dependent on the processor on which FreeRTOS+TCP is
+ * executed, as follows:
+ *
+ * If FreeRTOS+TCP is executed on one of the processors listed under the Special 
+ * License Arrangements heading of the FreeRTOS+TCP license information web 
+ * page, then it can be used under the terms of the FreeRTOS Open Source 
+ * License.  If FreeRTOS+TCP is used on any other processor, then it can be used
+ * under the terms of the GNU General Public License V2.  Links to the relevant
+ * licenses follow:
+ * 
+ * The FreeRTOS+TCP License Information Page: http://www.FreeRTOS.org/tcp_license 
+ * The FreeRTOS Open Source License: http://www.FreeRTOS.org/license
+ * The GNU General Public License Version 2: http://www.FreeRTOS.org/gpl-2.0.txt
  *
  * FreeRTOS+TCP is distributed in the hope that it will be useful.  You cannot
  * use FreeRTOS+TCP unless you agree that you use the software 'as is'.
@@ -71,11 +77,6 @@
 #include "FreeRTOS_TCP_server.h"
 #include "FreeRTOS_server_private.h"
 
-#if( FTP_OPTIMISE_STUDIES != 0 )
-	#include "hr_gettime.h"
-	#include "eventLogging.h"
-#endif
-
 #ifndef HTTP_SERVER_BACKLOG
 	#define HTTP_SERVER_BACKLOG			( 12 )
 #endif
@@ -96,9 +97,6 @@
 	#define ipconfigFTP_FS_USES_BACKSLAH	1
 #endif
 
-#if ipconfigUSE_FTP
-
-
 /* Some defines to make the code more readbale */
 #define pcCOMMAND_BUFFER	pxClient->pxParent->pcCommandBuffer
 #define pcNEW_DIR			pxClient->pxParent->pcNewDir
@@ -109,6 +107,19 @@
 #define TMODE_ASCII		2
 #define TMODE_7BITS		3
 #define TMODE_8BITS		4
+
+#if defined( FTP_WRITES_ALIGNED ) || defined( ipconfigFTP_WRITES_ALIGNED )
+	#error Name change : please rename the define to the new name 'ipconfigFTP_ZERO_COPY_ALIGNED_WRITES'
+#endif
+
+/*
+ * ipconfigFTP_ZERO_COPY_ALIGNED_WRITES : experimental optimisation option.
+ * If non-zero, receiving data will be done with the zero-copy method and also
+ * writes to disk will be done with sector-alignment as much as possible.
+ */
+#ifndef ipconfigFTP_ZERO_COPY_ALIGNED_WRITES
+	#define ipconfigFTP_ZERO_COPY_ALIGNED_WRITES			0
+#endif
 
 /*
  * This module only has 2 public functions:
@@ -252,7 +263,7 @@ BaseType_t xRc;
 	const struct xFTP_COMMAND *pxCommand;
 	char *pcRestCommand;
 
-		if( xRc < ( BaseType_t )HTTP_COMMAND_BUFFER_SIZE )
+		if( xRc < ( BaseType_t ) sizeof( pcCOMMAND_BUFFER ) )
 		{
 			pcCOMMAND_BUFFER[ xRc ] = '\0';
 		}
@@ -725,6 +736,8 @@ BaseType_t xResult;
 	/* Make sure the previous socket is deleted and flags reset */
 	prvTransferCloseSocket( pxClient );
 
+	pxClient->bits1.bEmptyFile = pdFALSE;
+
 	xSocket = FreeRTOS_socket( FREERTOS_AF_INET, FREERTOS_SOCK_STREAM, FREERTOS_IPPROTO_TCP );
 
 	if( ( xSocket != FREERTOS_NO_SOCKET ) && ( xSocket != FREERTOS_INVALID_SOCKET ) )
@@ -857,11 +870,10 @@ BaseType_t xRxSize;
 					struct freertos_sockaddr xRemoteAddress, xLocalAddress;
 					FreeRTOS_GetRemoteAddress( pxClient->xTransferSocket, &xRemoteAddress );
 					FreeRTOS_GetLocalAddress( pxClient->xTransferSocket, &xLocalAddress );
-					FreeRTOS_printf( ( "%s Connected from %u to %u xRxSize %u\n",
+					FreeRTOS_printf( ( "%s Connected from %u to %u\n",
 						pxClient->bits1.bIsListen != pdFALSE ? "PASV" : "PORT",
 						( unsigned ) FreeRTOS_ntohs( xLocalAddress.sin_port ),
-						( unsigned ) FreeRTOS_ntohs( xRemoteAddress.sin_port ),
-						( unsigned ) xRxSize ) );
+						( unsigned ) FreeRTOS_ntohs( xRemoteAddress.sin_port ) ) );
 				}
 				#endif /* ipconfigHAS_PRINTF */
 				FreeRTOS_FD_CLR( pxClient->xTransferSocket, pxClient->pxParent->xSocketSet, eSELECT_WRITE );
@@ -1270,11 +1282,8 @@ int iErrorNo;
 }
 /*-----------------------------------------------------------*/
 
-#ifndef ipconfigFTP_WRITES_ALIGNED
-	#define ipconfigFTP_WRITES_ALIGNED			0
-#endif
+#if( ipconfigFTP_ZERO_COPY_ALIGNED_WRITES == 0 )
 
-#if( ipconfigFTP_WRITES_ALIGNED == 0 )
 	static BaseType_t prvStoreFileWork( xFTPClient *pxClient )
 	{
 	BaseType_t xRc, xWritten;
@@ -1305,7 +1314,9 @@ int iErrorNo;
 		}
 		return xRc;
 	}
-#else	/* ipconfigFTP_WRITES_ALIGNED != 0 */
+
+#else	/* ipconfigFTP_ZERO_COPY_ALIGNED_WRITES != 0 */
+
 	static BaseType_t prvStoreFileWork( xFTPClient *pxClient )
 	{
 	BaseType_t xRc, xWritten;
@@ -1345,7 +1356,7 @@ int iErrorNo;
 				{
 				const struct xSTREAM_BUFFER *pxBuffer = FreeRTOS_get_rx_buf( pxClient->xTransferSocket );
 
-					int32_t lTail = pxBuffer->lTail;
+					int32_t lTail = pxBuffer->uxTail;
 					if( pxBuffer->LENGTH - lTail >= 512 )
 					{
 						/* At this moment there are les than 512 bytes in the RX buffer,
@@ -1388,7 +1399,8 @@ int iErrorNo;
 		}
 		return xRc;
 	}
-#endif /* ipconfigFTP_WRITES_ALIGNED */
+
+#endif /* ipconfigFTP_ZERO_COPY_ALIGNED_WRITES */
 /*-----------------------------------------------------------*/
 
 /*
@@ -1551,7 +1563,7 @@ BaseType_t xSetEvent = pdFALSE;
 
 		xRc = FreeRTOS_send( pxClient->xTransferSocket, pcFILE_BUFFER, xCount, 0 );
 #else /* ipconfigFTP_TX_ZERO_COPY != 0 */
-		/* Use zero-copy transmission: 
+		/* Use zero-copy transmission:
 		FreeRTOS_get_tx_head() returns a direct pointer to the TX stream and
 		set xBufferLength to know how much space there is left. */
 		pcBuffer = ( char * )FreeRTOS_get_tx_head( pxClient->xTransferSocket, &xBufferLength );
@@ -1596,15 +1608,6 @@ BaseType_t xSetEvent = pdFALSE;
 		}
 		pxClient->xBytesLeft -= xCount;
 
-		#if( FTP_OPTIMISE_STUDIES != 0 )
-		{
-			eventLogAdd( "%c: %06x : %u Buff %u",
-				pcBuffer != pcFILE_BUFFER ? 'Z' : 'N',
-				( unsigned ) pxClient->ulRecvBytes + xCount,
-				( unsigned ) xCount,
-				( unsigned ) xBufferLength );
-		}
-		#endif
 		if( pxClient->xBytesLeft == 0 )
 		{
 		BaseType_t xTrueValue = 1;
@@ -1705,7 +1708,7 @@ int iErrorNo;
 	pxClient->bits1.bDirHasEntry = ( xFindResult >= 0 );
 
 	iErrorNo = stdioGET_ERRNO();
-	if( ( xFindResult < 0 ) && ( iErrorNo == pdFREERTOS_ERRNO_ENOENT ) )
+	if( ( xFindResult < 0 ) && ( iErrorNo == pdFREERTOS_ERRNO_ENMFILE ) )
 	{
 		FreeRTOS_printf( ("prvListSendPrep: Empty directory? (%s)\n", pxClient->pcCurrentDir ) );
 		prvSendReply( pxClient->xTransferSocket, "total 0\r\n", 0 );
@@ -1763,7 +1766,7 @@ BaseType_t xTxSpace;
 			iRc = ff_findnext( &pxClient->xFindData );
 			iErrorNo = stdioGET_ERRNO();
 
-			xEndOfDir = ( iRc < 0 ) && ( iErrorNo == pdFREERTOS_ERRNO_ENOENT );
+			xEndOfDir = ( iRc < 0 ) && ( iErrorNo == pdFREERTOS_ERRNO_ENMFILE );
 
 			pxClient->bits1.bDirHasEntry = ( xEndOfDir == pdFALSE ) && ( iRc >= 0 );
 
@@ -1865,7 +1868,7 @@ static BaseType_t prvGetFileInfoStat( FF_DirEnt_t *pxEntry, char *pcLine, BaseTy
 	const char *pcFileName = pxEntry->pcFileName;
 
 	mode[ 0 ] = ( ( pxEntry->ucAttrib & FF_FAT_ATTR_DIR ) != 0 ) ? 'd' : '-';
-	#if( ffconfigDEV_SUPPORT != 0 ) && ( configFTP_USES_FULL_FAT != 0 )
+	#if( ffconfigDEV_SUPPORT != 0 )
 	{
 		if( ( pxEntry->ucAttrib & FF_FAT_ATTR_DIR ) == 0 )
 		{
@@ -2121,6 +2124,7 @@ int iResult;
 			pxClient->pcFileName, pcNEW_DIR ) );
 		myReply = REPL_553;
 		break;
+	case pdFREERTOS_ERRNO_ENXIO:
 	case pdFREERTOS_ERRNO_ENOENT:
 		/* if the source file was not found.
 		"450 Requested file action not taken.\r\n" */
@@ -2474,6 +2478,4 @@ BaseType_t xLength = strlen( pxClient->pcRootDir );
 
 	return xLength;
 }
-
-#endif /* endif ipconfigUSE_FTP   */
 /*-----------------------------------------------------------*/
