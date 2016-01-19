@@ -1758,13 +1758,7 @@ BaseType_t lHeaderLength = ( pxIPHeader->ucVersionHeaderLength & 0x0F) << 2;
 
 		/* Update the checksum because the ucTypeOfMessage member in the header
 		has been changed to ipICMP_ECHO_REPLY.  This is faster than calling
-		usGenerateChecksum().
-
-		TODO: BUG FIX, report IT. If hardware checksum offload is enable code below should not be executed.
-		Checksum header should be set to 0 so ETH MAC can generate proper checksum.
-		*/
-
-#if ipconfigDRIVER_INCLUDED_TX_IP_CHECKSUM == 0
+		usGenerateChecksum(). */
 
 		if( pxICMPHeader->usChecksum >= FreeRTOS_htons( ( ( uint16_t ) 0xffffU ) - ( ipICMP_ECHO_REQUEST << ( ( uint16_t ) 8U ) ) ) )
 		{
@@ -1778,9 +1772,6 @@ BaseType_t lHeaderLength = ( pxIPHeader->ucVersionHeaderLength & 0x0F) << 2;
 				( ( ( uint32_t ) pxICMPHeader->usChecksum ) +
 					FreeRTOS_htons( ipICMP_ECHO_REQUEST << ( ( uint16_t ) 8U ) ) );
 		}
-#else
-		pxICMPHeader->usChecksum = 0;
-#endif
 
 		return eReturnEthernetFrame;
 	}
