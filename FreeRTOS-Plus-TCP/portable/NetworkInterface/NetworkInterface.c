@@ -135,8 +135,7 @@ void HAL_ETH_MspInit(ETH_HandleTypeDef* heth) {
 
 		/* USER CODE END ETH_MspInit 0 */
 		/* Peripheral clock enable */
-		__ETH_CLK_ENABLE()
-		;
+		__ETH_CLK_ENABLE();
 
 		//enable gpio clocks
 		RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOCEN | RCC_AHB1ENR_GPIOBEN;
@@ -173,7 +172,7 @@ void HAL_ETH_MspInit(ETH_HandleTypeDef* heth) {
 		GPIO_InitStruct.Alternate = GPIO_AF11_ETH;
 		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-		HAL_NVIC_SetPriority(ETH_IRQn, 9, 0);
+		HAL_NVIC_SetPriority(ETH_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY, 0);
 		HAL_NVIC_EnableIRQ(ETH_IRQn);
 
 	}
@@ -621,4 +620,7 @@ void vApplicationIPNetworkEventHook(eIPCallbackEvent_t eNetworkEvent) {
 		gdb.sys.dnsaddress = ulDNSServerAddress;
 	}
 }
+
+
+
 

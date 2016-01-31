@@ -53,13 +53,6 @@ MAC_ADDR3, MAC_ADDR4, MAC_ADDR5 };
 
 // ----- main() ---------------------------------------------------------------
 
-// Sample pragmas to cope with warnings. Please note the related line at
-// the end of this function, used to pop the compiler diagnostics status.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wmissing-declarations"
-#pragma GCC diagnostic ignored "-Wreturn-type"
-
 uint64_t u64IdleTicksCnt = 0; // Counts when the OS has no task to execute.
 uint64_t tickTime = 0;        // Counts OS ticks (default = 1000Hz).
 
@@ -78,8 +71,6 @@ void vApplicationTickHook(void) {
 void vApplicationIdleHook(void) {
 
 	++u64IdleTicksCnt;
-	// MX_USB_HOST_Process();
-	// GPIOD->ODR ^=GPIO_ODR_ODR_13;
 }
 
 // A required FreeRTOS function.
@@ -103,39 +94,48 @@ void vApplicationStackOverflowHook(TaskHandle_t pxTask, signed char *pcTaskName)
 
 }
 
-void vBlinkLed(void * pvparameters) {
-
+void NetworkScanBuffers(void)
+{
 	UBaseType_t uxCurrentCount;
-	UBaseType_t uxLastMinBufferCount = 0;
+	static UBaseType_t uxLastMinBufferCount = 0;
+
+	uxCurrentCount = uxGetMinimumFreeNetworkBuffers();
+	if( uxLastMinBufferCount != uxCurrentCount )
+	{
+		/* The logging produced below may be helpful
+		while tuning +TCP: see how many buffers are in use. */
+		uxLastMinBufferCount = uxCurrentCount;
+		FreeRTOS_printf( ( "Network buffers: %lu lowest %lu\n",
+			uxGetNumberOfFreeNetworkBuffers(), uxCurrentCount ) );
+	}
+
+	#if( ipconfigCHECK_IP_QUEUE_SPACE != 0 )
+	{
+		UBaseType_t uxLastMinQueueSpace = 0;
+
+		uxCurrentCount = uxGetMinimumIPQueueSpace();
+		if( uxLastMinQueueSpace != uxCurrentCount )
+		{
+			/* The logging produced below may be helpful
+			while tuning +TCP: see how many buffers are in use. */
+			uxLastMinQueueSpace = uxCurrentCount;
+			FreeRTOS_printf( ( "Queue space: lowest %lu\n", uxCurrentCount ) );
+		}
+	}
+	#endif /* ipconfigCHECK_IP_QUEUE_SPACE */
+
+
+
+}
+
+void vOneSecTask(void * pvparameters) {
 
 	for (;;) {
 
 		vTaskDelay(500 / portTICK_RATE_MS);
 		GPIOD->ODR ^= GPIO_ODR_ODR_12;
 		FF_USBH_d(usbhDisk);
-
-		uxCurrentCount = uxGetMinimumFreeNetworkBuffers();
-		if( uxLastMinBufferCount != uxCurrentCount )
-		{
-			/* The logging produced below may be helpful
-			while tuning +TCP: see how many buffers are in use. */
-			uxLastMinBufferCount = uxCurrentCount;
-			FreeRTOS_printf( ( "Network buffers: %lu lowest %lu\n",
-				uxGetNumberOfFreeNetworkBuffers(), uxCurrentCount ) );
-		}
-
-		#if( ipconfigCHECK_IP_QUEUE_SPACE != 0 )
-		{
-			uxCurrentCount = uxGetMinimumIPQueueSpace();
-			if( uxLastMinQueueSpace != uxCurrentCount )
-			{
-				/* The logging produced below may be helpful
-				while tuning +TCP: see how many buffers are in use. */
-				uxLastMinQueueSpace = uxCurrentCount;
-				FreeRTOS_printf( ( "Queue space: lowest %lu\n", uxCurrentCount ) );
-			}
-		}
-		#endif /* ipconfigCHECK_IP_QUEUE_SPACE */
+		NetworkScanBuffers();
 
 	}
 
@@ -162,7 +162,7 @@ void Main_task(void * pvparameters) {
 	print_console(welcome_logo);
 	console_mngt_init();
 	MX_USB_HOST_Init();
-	xTaskCreate(vBlinkLed, "Blink Led", 3*configMINIMAL_STACK_SIZE, NULL, 0, NULL);
+	xTaskCreate(vOneSecTask, "1_sec", 3*configMINIMAL_STACK_SIZE, NULL, 0, NULL);
 
 
 	//prvCreateDiskAndExampleFiles(); //TODO: nie postawie fata na ramie w procku bo mam go za malo... minimalnie to 2Mb
@@ -281,8 +281,6 @@ static void prvServerWorkTask(void *pvParameters) {
 int main(int argc, char* argv[]) {
 	// At this stage the system clock should have already been configured
 	// at high speed.
-
-	HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
 	SystemClock_Config();
 

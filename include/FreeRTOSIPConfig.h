@@ -103,6 +103,9 @@ messages. */
 	#define FreeRTOS_printf( X )		FreeRTOS_printfx X
 #endif
 
+/* Allows scanning queue free space - for future expansion */
+#define ipconfigCHECK_IP_QUEUE_SPACE	0
+
 /* Define the byte order of the target MCU (the MCU FreeRTOS+TCP is executing
 on).  Valid options are FREERTOS_BIG_ENDIAN and FREERTOS_LITTLE_ENDIAN. */
 #define ipconfigBYTE_ORDER FREERTOS_LITTLE_ENDIAN
